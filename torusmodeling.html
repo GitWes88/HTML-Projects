@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Polygon Torus Modeler</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root{
+    --bg: #0d1420;
+    --bg-deep: #080c14;
+    --panel: #121b2b;
+    --panel-line: #223047;
+    --grid-line: #1a2740;
+    --ink: #dfe7f2;
+    --ink-dim: #7f92ab;
+    --accent: #ff8c42;
+    --accent-dim: #a85a2a;
+    --face-fill: #35507a;
+  }
+  :root:not([data-theme="light"]){ }
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --bg: #eef1f6;
+      --bg-deep: #e2e7ee;
+      --panel: #ffffff;
+      --panel-line: #d3dbe6;
+      --grid-line: #dbe2ec;
+      --ink: #16202f;
+      --ink-dim: #64748b;
+      --accent: #d9611f;
+      --accent-dim: #f0a868;
+      --face-fill: #b9c9e3;
+    }
+  }
+  :root[data-theme="light"]{
+    --bg: #eef1f6; --bg-deep: #e2e7ee; --panel: #ffffff; --panel-line: #d3dbe6;
+    --grid-line: #dbe2ec; --ink: #16202f; --ink-dim: #64748b; --accent: #d9611f;
+    --accent-dim: #f0a868; --face-fill: #b9c9e3;
+  }
+
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; height:100%; overflow:hidden; background: var(--bg); }
+  body{
+    font-family: 'Space Grotesk', sans-serif;
+    color: var(--ink);
+  }
+  #stage{ position:fixed; inset:0; }
+  canvas{ display:block; touch-action: none; }
+
+  #title{
+    position:fixed; top:20px; left:22px;
+    font-size: 15px; letter-spacing: 0.01em; font-weight:600;
+    color: var(--ink); z-index: 5; user-select:none;
+    display:flex; align-items:baseline; gap:8px;
+  }
+  #title span{ color: var(--ink-dim); font-weight:400; font-size:13px; }
+
+  #readout{
+    position:fixed; top:20px; right:22px; z-index:5;
+    font-family:'JetBrains Mono', monospace; font-size:11px; color: var(--ink-dim);
+    text-align:right; line-height:1.6; user-select:none;
+  }
+  #readout b{ color: var(--ink); font-weight:600; }
+
+  #panel{
+    position:fixed; right:22px; bottom:22px; width:290px;
+    background: var(--panel); border:1px solid var(--panel-line);
+    border-radius:3px; padding:18px 18px 16px;
+    z-index: 10; max-height: calc(100vh - 120px); overflow-y:auto;
+  }
+  #panel::-webkit-scrollbar{ width:6px; }
+  #panel::-webkit-scrollbar-thumb{ background: var(--panel-line); border-radius:3px; }
+
+  .presets{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; }
+  .chip{
+    font-family:'Space Grotesk', sans-serif; font-size:12px; font-weight:500;
+    background:transparent; color: var(--ink-dim); border:1px solid var(--panel-line);
+    padding:6px 11px; border-radius:2px; cursor:pointer; transition: all .12s ease;
+  }
+  .chip:hover{ color: var(--ink); border-color: var(--accent-dim); }
+  .chip.active{ color: var(--bg-deep); background: var(--accent); border-color: var(--accent); }
+
+  .row{ margin-bottom:14px; }
+  .row-label{
+    display:flex; justify-content:space-between; align-items:baseline;
+    font-size:12px; color: var(--ink-dim); margin-bottom:6px;
+  }
+  .row-label b{
+    font-family:'JetBrains Mono', monospace; color: var(--ink); font-weight:500; font-size:12px;
+  }
+  input[type="range"]{
+    -webkit-appearance:none; width:100%; height:2px; background: var(--panel-line);
+    border-radius:1px; outline:none; margin:0;
+  }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:13px; height:13px; border-radius:50%;
+    background: var(--accent); cursor:pointer; border: 2px solid var(--panel);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  input[type="range"]::-moz-range-thumb{
+    width:11px; height:11px; border-radius:50%; background: var(--accent);
+    cursor:pointer; border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--accent);
+  }
+
+  .divider{ height:1px; background: var(--panel-line); margin:16px 0; }
+
+  .toggles{ display:flex; flex-direction:column; gap:10px; margin-bottom:4px; }
+  .toggle-row{ display:flex; align-items:center; justify-content:space-between; }
+  .toggle-row label{ font-size:12.5px; color: var(--ink); cursor:pointer; user-select:none; }
+  .switch{
+    position:relative; width:34px; height:19px; flex-shrink:0;
+  }
+  .switch input{ opacity:0; width:0; height:0; position:absolute; }
+  .slider-switch{
+    position:absolute; inset:0; background: var(--panel-line); border-radius:20px; cursor:pointer;
+    transition: background .15s;
+  }
+  .slider-switch::before{
+    content:""; position:absolute; width:13px; height:13px; left:3px; top:3px;
+    background: var(--ink-dim); border-radius:50%; transition: transform .15s, background .15s;
+  }
+  input:checked + .slider-switch{ background: var(--accent-dim); }
+  input:checked + .slider-switch::before{ transform: translateX(15px); background: var(--accent); }
+
+  #hint{
+    position:fixed; left:22px; bottom:22px; z-index:5;
+    font-size:11.5px; color: var(--ink-dim); user-select:none;
+  }
+</style>
+</head>
+<body>
+
+<div id="stage"></div>
+
+<div id="title">Polygon Torus <span>parametric ring modeler</span></div>
+<div id="readout">
+  cross-section <b id="rSides">4</b>-gon &middot; <b id="rSegs">48</b> ring divisions<br>
+  <b id="rVerts">0</b> vertices &middot; <b id="rTris">0</b> triangles
+</div>
+<div id="hint">drag to orbit &middot; scroll to zoom</div>
+
+<div id="panel">
+  <div class="presets" id="presets">
+    <button class="chip" data-sides="3">Triangular</button>
+    <button class="chip active" data-sides="4">Square</button>
+    <button class="chip" data-sides="5">Pentagonal</button>
+    <button class="chip" data-sides="6">Hexagonal</button>
+    <button class="chip" data-sides="8">Octagonal</button>
+  </div>
+
+  <div class="row">
+    <div class="row-label"><span>Cross-section sides</span><b id="vSides">4</b></div>
+    <input type="range" id="sides" min="3" max="16" step="1" value="4">
+  </div>
+  <div class="row">
+    <div class="row-label"><span>Ring divisions</span><b id="vSegs">48</b></div>
+    <input type="range" id="segs" min="3" max="120" step="1" value="48">
+  </div>
+  <div class="row">
+    <div class="row-label"><span>Major radius</span><b id="vMajor">2.20</b></div>
+    <input type="range" id="major" min="0.6" max="4" step="0.05" value="2.2">
+  </div>
+  <div class="row">
+    <div class="row-label"><span>Cross-section radius</span><b id="vMinor">0.70</b></div>
+    <input type="range" id="minor" min="0.1" max="1.6" step="0.02" value="0.7">
+  </div>
+  <div class="row">
+    <div class="row-label"><span>Spiral twist</span><b id="vTwist">0.00</b></div>
+    <input type="range" id="twist" min="-3" max="3" step="0.05" value="0">
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="toggles">
+    <div class="toggle-row">
+      <label for="wire">Wireframe</label>
+      <span class="switch"><input type="checkbox" id="wire"><span class="slider-switch"></span></span>
+    </div>
+    <div class="toggle-row">
+      <label for="rotate">Auto-rotate</label>
+      <span class="switch"><input type="checkbox" id="rotate" checked><span class="slider-switch"></span></span>
+    </div>
+    <div class="toggle-row">
+      <label for="shade">Flat shading</label>
+      <span class="switch"><input type="checkbox" id="shade" checked><span class="slider-switch"></span></span>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ---------- scene setup ----------
+  const stage = document.getElementById('stage');
+  const scene = new THREE.Scene();
+
+  function readVar(name){
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  const camera = new THREE.PerspectiveCamera(42, window.innerWidth/window.innerHeight, 0.1, 100);
+  const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  stage.appendChild(renderer.domElement);
+
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x1a1a2a, 0.9);
+  scene.add(hemi);
+  const key = new THREE.DirectionalLight(0xffffff, 1.0);
+  key.position.set(4, 6, 5);
+  scene.add(key);
+  const fill = new THREE.DirectionalLight(0xfff0e0, 0.35);
+  fill.position.set(-5, -3, -4);
+  scene.add(fill);
+
+  // faint reference grid, colored via CSS var
+  let grid = null;
+  function buildGrid(){
+    if (grid) scene.remove(grid);
+    const c = new THREE.Color(readVar('--grid-line') || '#1a2740');
+    grid = new THREE.GridHelper(10, 20, c, c);
+    grid.material.opacity = 0.5;
+    grid.material.transparent = true;
+    grid.position.y = -2.4;
+    scene.add(grid);
+  }
+  buildGrid();
+
+  let mesh = null;
+  let wireMesh = null;
+
+  function buildGeometry(sides, segments, R, r, twistTurns){
+    const positions = [];
+    function vertex(i, j){
+      const theta = (i / segments) * Math.PI * 2;
+      const phi = (j / sides) * Math.PI * 2 + twistTurns * theta;
+      const cosT = Math.cos(theta), sinT = Math.sin(theta);
+      const off = r * Math.cos(phi);
+      const z = r * Math.sin(phi);
+      return new THREE.Vector3(
+        (R + off) * cosT,
+        (R + off) * sinT,
+        z
+      );
+    }
+    for (let i = 0; i < segments; i++){
+      for (let j = 0; j < sides; j++){
+        const a = vertex(i, j);
+        const b = vertex(i + 1, j);
+        const c = vertex(i + 1, j + 1);
+        const d = vertex(i, j + 1);
+        positions.push(a.x,a.y,a.z, b.x,b.y,b.z, c.x,c.y,c.z);
+        positions.push(a.x,a.y,a.z, c.x,c.y,c.z, d.x,d.y,d.z);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.computeVertexNormals();
+    return geo;
+  }
+
+  function currentParams(){
+    return {
+      sides: parseInt(sidesEl.value, 10),
+      segs: parseInt(segsEl.value, 10),
+      major: parseFloat(majorEl.value),
+      minor: parseFloat(minorEl.value),
+      twist: parseFloat(twistEl.value)
+    };
+  }
+
+  function rebuild(){
+    const p = currentParams();
+    const geo = buildGeometry(p.sides, p.segs, p.major, p.minor, p.twist);
+
+    if (mesh){ scene.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); }
+    if (wireMesh){ scene.remove(wireMesh); wireMesh.geometry.dispose(); wireMesh.material.dispose(); }
+
+    const accent = new THREE.Color(readVar('--face-fill') || '#35507a');
+    const mat = new THREE.MeshStandardMaterial({
+      color: accent,
+      metalness: 0.15,
+      roughness: 0.55,
+      flatShading: shadeEl.checked,
+      side: THREE.DoubleSide
+    });
+    mesh = new THREE.Mesh(geo, mat);
+    scene.add(mesh);
+
+    const edgeGeo = new THREE.EdgesGeometry(geo, 1);
+    const edgeColor = new THREE.Color(readVar('--accent') || '#ff8c42');
+    const edgeMat = new THREE.LineBasicMaterial({ color: edgeColor, transparent:true, opacity: wireEl.checked ? 0.9 : 0.18 });
+    wireMesh = new THREE.LineSegments(edgeGeo, edgeMat);
+    scene.add(wireMesh);
+
+    mesh.visible = !wireEl.checked;
+
+    document.getElementById('rSides').textContent = p.sides;
+    document.getElementById('rSegs').textContent = p.segs;
+    document.getElementById('rVerts').textContent = (p.sides * p.segs * 6).toLocaleString();
+    document.getElementById('rTris').textContent = (p.sides * p.segs * 2).toLocaleString();
+  }
+
+  // ---------- manual orbit controls ----------
+  let camTheta = 0.9, camPhi = 1.1, camRadius = 7.2;
+  let dragging = false, lastX = 0, lastY = 0;
+
+  function updateCamera(){
+    const x = camRadius * Math.sin(camPhi) * Math.cos(camTheta);
+    const y = camRadius * Math.cos(camPhi);
+    const z = camRadius * Math.sin(camPhi) * Math.sin(camTheta);
+    camera.position.set(x, y, z);
+    camera.lookAt(0, 0, 0);
+  }
+  updateCamera();
+
+  renderer.domElement.addEventListener('pointerdown', (e) => {
+    dragging = true; lastX = e.clientX; lastY = e.clientY;
+  });
+  window.addEventListener('pointerup', () => dragging = false);
+  window.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    camTheta -= dx * 0.006;
+    camPhi -= dy * 0.006;
+    camPhi = Math.max(0.15, Math.min(Math.PI - 0.15, camPhi));
+    updateCamera();
+  });
+  renderer.domElement.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    camRadius *= (1 + e.deltaY * 0.001);
+    camRadius = Math.max(2.5, Math.min(20, camRadius));
+    updateCamera();
+  }, { passive:false });
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // ---------- UI wiring ----------
+  const sidesEl = document.getElementById('sides');
+  const segsEl = document.getElementById('segs');
+  const majorEl = document.getElementById('major');
+  const minorEl = document.getElementById('minor');
+  const twistEl = document.getElementById('twist');
+  const wireEl = document.getElementById('wire');
+  const rotateEl = document.getElementById('rotate');
+  const shadeEl = document.getElementById('shade');
+
+  const vSides = document.getElementById('vSides');
+  const vSegs = document.getElementById('vSegs');
+  const vMajor = document.getElementById('vMajor');
+  const vMinor = document.getElementById('vMinor');
+  const vTwist = document.getElementById('vTwist');
+
+  const presetButtons = document.querySelectorAll('.chip');
+  presetButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      sidesEl.value = btn.dataset.sides;
+      presetButtons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      syncLabels();
+      rebuild();
+    });
+  });
+
+  function syncActiveChip(){
+    let matched = false;
+    presetButtons.forEach(b => {
+      if (b.dataset.sides === sidesEl.value){ b.classList.add('active'); matched = true; }
+      else b.classList.remove('active');
+    });
+  }
+
+  function syncLabels(){
+    vSides.textContent = sidesEl.value;
+    vSegs.textContent = segsEl.value;
+    vMajor.textContent = parseFloat(majorEl.value).toFixed(2);
+    vMinor.textContent = parseFloat(minorEl.value).toFixed(2);
+    vTwist.textContent = parseFloat(twistEl.value).toFixed(2);
+    syncActiveChip();
+  }
+
+  [sidesEl, segsEl, majorEl, minorEl, twistEl].forEach(el => {
+    el.addEventListener('input', () => { syncLabels(); rebuild(); });
+  });
+  wireEl.addEventListener('change', rebuild);
+  shadeEl.addEventListener('change', rebuild);
+
+  // ---------- theme change (light/dark) live update ----------
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => {
+    buildGrid(); rebuild();
+  });
+
+  // ---------- render loop ----------
+  function animate(){
+    requestAnimationFrame(animate);
+    if (rotateEl.checked && mesh){
+      mesh.rotation.z += 0.0025;
+      wireMesh.rotation.z += 0.0025;
+    }
+    renderer.render(scene, camera);
+  }
+
+  syncLabels();
+  rebuild();
+  animate();
+})();
+</script>
+
+</body>
+</html>
