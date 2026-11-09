@@ -1,0 +1,1109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lifelight</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400..700&display=swap">
+<style>
+html{color-scheme:light}
+body{margin:0}
+
+/* Layout concept: a luminous stage holds the living grid; a quiet instrument rail beside it holds the rule, run, brush and view controls.
+   The rule is set large in the display face and coloured by role: birth digits take the newborn-cell colour, survival digits the mature-cell colour. */
+:root{
+  --display:'Bricolage Grotesque','Avenir Next','Segoe UI',system-ui,sans-serif;
+  --body:'Instrument Sans','Segoe UI',system-ui,-apple-system,sans-serif;
+  --mono:'DM Mono',ui-monospace,'SFMono-Regular',Menlo,Consolas,monospace;
+
+  --bg:#e9eff5;
+  --panel:#f5f8fb;
+  --field:#ffffff;
+  --stage:#fbfdff;
+  --stage-edge:#e2eaf3;
+  --line:#d3dde8;
+  --line-strong:#b3c2d3;
+  --fg:#0f1b2a;
+  --muted:#556a80;
+  --birth:#00836a;
+  --on-birth:#ffffff;
+  --survive:#2d5bd1;
+  --on-survive:#ffffff;
+  --warn:#c2402b;
+  --focus:#1d4ed8;
+  --age-1:#00b38a;
+  --age-2:#0a93b8;
+  --age-3:#3764d6;
+  --age-4:#5b36b5;
+  --trail:#7fa6cf;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#060a11;
+    --panel:#0c131d;
+    --field:#101a27;
+    --stage:#0a121c;
+    --stage-edge:#04070c;
+    --line:#1b2838;
+    --line-strong:#2b3d52;
+    --fg:#e6eef6;
+    --muted:#8aa0b6;
+    --birth:#7ff2cf;
+    --on-birth:#03130f;
+    --survive:#4aa8f0;
+    --on-survive:#03121e;
+    --warn:#ff907c;
+    --focus:#9bd2ff;
+    --age-1:#f2fffa;
+    --age-2:#7ff2cf;
+    --age-3:#3aaee6;
+    --age-4:#6f6bf0;
+    --trail:#2a6f9e;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#060a11;
+  --panel:#0c131d;
+  --field:#101a27;
+  --stage:#0a121c;
+  --stage-edge:#04070c;
+  --line:#1b2838;
+  --line-strong:#2b3d52;
+  --fg:#e6eef6;
+  --muted:#8aa0b6;
+  --birth:#7ff2cf;
+  --on-birth:#03130f;
+  --survive:#4aa8f0;
+  --on-survive:#03121e;
+  --warn:#ff907c;
+  --focus:#9bd2ff;
+  --age-1:#f2fffa;
+  --age-2:#7ff2cf;
+  --age-3:#3aaee6;
+  --age-4:#6f6bf0;
+  --trail:#2a6f9e;
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:14.5px/1.45 var(--body);-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+.app{
+  max-width:1280px;margin-inline:auto;
+  padding-block:20px 28px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:18px;
+}
+
+/* header */
+.top{display:flex;align-items:center;gap:14px}
+.mark{flex:none;width:34px;height:34px}
+.mark rect{transition:fill .2s}
+.top h1{margin:0;font:700 26px/1 var(--display);letter-spacing:-.01em}
+.top p{margin:4px 0 0;color:var(--muted);font-size:13.5px}
+
+/* layout */
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:20px;align-items:start}
+.stage-col{min-width:0;position:sticky;top:16px;display:flex;flex-direction:column;gap:14px}
+.stage{
+  position:relative;height:clamp(360px,calc(100vh - 250px),780px);
+  border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--stage);
+}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
+.stage-note{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(30ch,80%);
+  text-align:center;color:var(--muted);font-size:14px;pointer-events:none;
+}
+
+/* readout */
+.readout{
+  display:flex;flex-wrap:wrap;gap:16px 28px;align-items:flex-end;
+  padding:14px 18px;border:1px solid var(--line);border-radius:14px;background:var(--panel);
+}
+.stats{display:flex;flex-wrap:wrap;gap:12px 28px}
+.stat{min-width:64px}
+.stat dt{font:500 10.5px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.stat dd{margin:4px 0 0;font:500 22px/1.1 var(--mono);font-variant-numeric:tabular-nums}
+.spark{flex:1 1 220px;min-width:0}
+.spark-cap{display:flex;justify-content:space-between;gap:12px;font:500 10.5px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.spark-body{height:58px}
+.spark-body canvas{display:block;width:100%;height:100%}
+
+/* rail */
+.rail{min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px}
+.sec{display:flex;flex-direction:column;gap:12px;padding-block:18px;border-top:1px solid var(--line)}
+.sec:first-child{border-top:0;padding-top:0}
+.sec:last-child{padding-bottom:0}
+.sec h2{margin:0;font:500 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.note{margin:0;color:var(--muted);font-size:13px}
+.label{font:500 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+
+/* rule display */
+.rule-wrap{position:relative;border-bottom:2px solid var(--line-strong);transition:border-color .15s}
+.rule-wrap:focus-within{border-bottom-color:var(--fg)}
+.rule-wrap.bad{border-bottom-color:var(--warn)}
+.rule-input,.rule-display{
+  display:block;width:100%;margin:0;padding:4px 0 10px;border:0;background:transparent;
+  font:700 clamp(32px,4.4vw,44px)/1.05 var(--display);letter-spacing:.01em;text-transform:uppercase;white-space:pre;
+}
+.rule-input{position:relative;color:transparent;caret-color:var(--fg);outline:none}
+.rule-input::selection{background:color-mix(in srgb,var(--survive) 35%,transparent)}
+.rule-display{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.c-b{color:var(--birth)}
+.c-s{color:var(--survive)}
+.c-x{color:var(--muted)}
+.rule-sentence{margin:0;font-size:14px}
+.rule-sentence b{font-weight:700}
+.rule-error{margin:0;color:var(--warn);font-size:13px}
+
+/* digit rows */
+.digit-row{display:flex;flex-direction:column;gap:6px}
+.row-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.row-cap{font:400 11px var(--mono);color:var(--muted)}
+.digits{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:5px}
+.digit{
+  aspect-ratio:1/1.12;border:1px solid var(--line-strong);background:var(--field);color:var(--muted);
+  border-radius:8px;font:500 14px var(--mono);cursor:pointer;padding:0;transition:background .12s,color .12s,border-color .12s;
+}
+.digit:hover:not(:disabled){border-color:var(--fg);color:var(--fg)}
+.digit:disabled{opacity:.3;cursor:not-allowed}
+[data-kind="birth"] .digit[aria-pressed="true"]{background:var(--birth);border-color:var(--birth);color:var(--on-birth)}
+[data-kind="survive"] .digit[aria-pressed="true"]{background:var(--survive);border-color:var(--survive);color:var(--on-survive)}
+
+/* controls */
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.preset-line{display:flex;gap:8px}
+.select{position:relative;flex:1;min-width:0}
+.select select{
+  appearance:none;-webkit-appearance:none;width:100%;background:var(--field);color:var(--fg);
+  border:1px solid var(--line-strong);border-radius:10px;padding:9px 34px 9px 12px;font-weight:500;cursor:pointer;
+}
+.select::after{
+  content:"";position:absolute;right:14px;top:50%;width:7px;height:7px;pointer-events:none;
+  border-right:1.5px solid var(--muted);border-bottom:1.5px solid var(--muted);transform:translateY(-70%) rotate(45deg);
+}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:9px 14px;
+  border:1px solid var(--line-strong);background:var(--field);color:var(--fg);border-radius:10px;
+  font-weight:600;cursor:pointer;transition:border-color .12s,background .12s;
+}
+.btn:hover{border-color:var(--fg)}
+.btn.primary{background:var(--fg);border-color:var(--fg);color:var(--panel)}
+.btn svg{flex:none}
+.icon-btn{padding:9px 11px}
+.btn-row{display:flex;gap:8px}
+.btn-row .grow{flex:1}
+.seg{
+  display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:2px;padding:3px;
+  border:1px solid var(--line-strong);border-radius:10px;background:var(--field);
+}
+.seg button{border:0;background:transparent;color:var(--muted);border-radius:7px;padding:7px 6px;font-weight:600;cursor:pointer;white-space:nowrap}
+.seg button:hover{color:var(--fg)}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--panel)}
+.slider{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center}
+.slider output{font:500 12px var(--mono);color:var(--fg);font-variant-numeric:tabular-nums}
+.slider input{grid-column:1/-1}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:22px;background:transparent;margin:0;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:var(--line-strong)}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;box-sizing:border-box;width:16px;height:16px;margin-top:-6px;border-radius:50%;
+  background:var(--fg);border:2px solid var(--panel);box-shadow:0 0 0 1px var(--line-strong);
+}
+input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(--line-strong)}
+input[type=range]::-moz-range-thumb{box-sizing:border-box;width:16px;height:16px;border-radius:50%;background:var(--fg);border:2px solid var(--panel);box-shadow:0 0 0 1px var(--line-strong)}
+.switches{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+.switch{display:flex;align-items:center;gap:10px;position:relative;cursor:pointer;min-width:0}
+.switch input{position:absolute;left:0;top:0;width:34px;height:20px;margin:0;opacity:0;cursor:pointer}
+.switch .track{flex:none;width:34px;height:20px;border-radius:10px;background:var(--line-strong);position:relative;transition:background .15s}
+.switch .track::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:var(--muted);transition:transform .15s,background .15s}
+.switch input:checked + .track{background:var(--fg)}
+.switch input:checked + .track::after{background:var(--panel);transform:translateX(14px)}
+.switch input:focus-visible + .track{outline:2px solid var(--focus);outline-offset:2px}
+.hint{margin:0;color:var(--muted);font:400 11.5px/1.5 var(--mono)}
+.hint kbd{font:500 11px var(--mono);border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:5px;padding:0 5px;color:var(--fg);background:var(--field)}
+@media (hover:none){.hint{display:none}}
+
+@media (max-width:900px){
+  .layout{grid-template-columns:minmax(0,1fr)}
+  .stage-col{position:static}
+  .stage{height:auto;aspect-ratio:1/1;max-height:74vh}
+}
+@media (max-width:520px){
+  .rail{padding:16px}
+  .top h1{font-size:23px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="top">
+    <svg class="mark" viewBox="0 0 30 30" aria-hidden="true">
+      <rect x="11" y="2" width="8" height="8" rx="2.4" style="fill:var(--age-1)"/>
+      <rect x="20" y="11" width="8" height="8" rx="2.4" style="fill:var(--age-2)"/>
+      <rect x="2" y="20" width="8" height="8" rx="2.4" style="fill:var(--age-3)"/>
+      <rect x="11" y="20" width="8" height="8" rx="2.4" style="fill:var(--age-3)"/>
+      <rect x="20" y="20" width="8" height="8" rx="2.4" style="fill:var(--age-4)"/>
+    </svg>
+    <div>
+      <h1>Lifelight</h1>
+      <p>Conway's Game of Life, with rules you can change.</p>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="stage-col" aria-label="Simulation">
+      <div class="stage" id="stage">
+        <canvas id="board" role="img" aria-label="Game of Life grid. Click or drag to paint live cells."></canvas>
+        <p class="stage-note" id="emptyNote" hidden>Nothing is alive. Paint cells, stamp a pattern, or press Scatter.</p>
+      </div>
+      <div class="readout">
+        <dl class="stats">
+          <div class="stat"><dt>Generation</dt><dd id="statGen">0</dd></div>
+          <div class="stat"><dt>Population</dt><dd id="statPop">0</dd></div>
+          <div class="stat"><dt>Density</dt><dd id="statDen">0%</dd></div>
+          <div class="stat"><dt>Grid</dt><dd id="statGrid">0 × 0</dd></div>
+        </dl>
+        <div class="spark">
+          <div class="spark-cap"><span>Population</span><span id="statPeak">peak 0</span></div>
+          <div class="spark-body" id="sparkBody"><canvas id="spark" aria-label="Population over the last 240 generations" role="img"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="rail" aria-label="Controls">
+      <section class="sec" aria-labelledby="h-rule">
+        <h2 id="h-rule">Rule</h2>
+        <div class="rule-wrap" id="ruleWrap">
+          <div class="rule-display" id="ruleDisplay" aria-hidden="true"></div>
+          <input class="rule-input" id="ruleText" type="text" value="B3/S23" spellcheck="false" autocomplete="off" autocapitalize="characters" maxlength="24" aria-label="Rule in B/S notation" aria-describedby="ruleSentence ruleError">
+        </div>
+        <p class="rule-sentence" id="ruleSentence"></p>
+        <p class="rule-error" id="ruleError" hidden>Write the rule like B3/S23: B and the neighbor counts that cause birth, then S and the counts that let a cell survive.</p>
+
+        <div class="digit-row" data-kind="birth">
+          <div class="row-head"><span class="label">Birth</span><span class="row-cap">dead cell comes alive</span></div>
+          <div class="digits" role="group" aria-label="Neighbor counts that cause birth"></div>
+        </div>
+        <div class="digit-row" data-kind="survive">
+          <div class="row-head"><span class="label">Survive</span><span class="row-cap">live cell stays alive</span></div>
+          <div class="digits" role="group" aria-label="Neighbor counts that let a cell survive"></div>
+        </div>
+
+        <div class="field">
+          <label class="label" for="preset">Preset</label>
+          <div class="preset-line">
+            <div class="select"><select id="preset"></select></div>
+            <button class="btn icon-btn" id="surprise" type="button" aria-label="Pick a random rule" title="Random rule">
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="9" cy="9" r="1.5" fill="currentColor"/><circle cx="15" cy="9" r="1.5" fill="currentColor"/><circle cx="9" cy="15" r="1.5" fill="currentColor"/><circle cx="15" cy="15" r="1.5" fill="currentColor"/></svg>
+            </button>
+          </div>
+          <p class="note" id="presetNote"></p>
+        </div>
+
+        <div class="pair">
+          <div class="field">
+            <span class="label" id="l-hood">Neighbors</span>
+            <div class="seg" id="segHood" role="group" aria-labelledby="l-hood">
+              <button type="button" data-v="moore" aria-pressed="true" title="All 8 surrounding cells count">8-way</button>
+              <button type="button" data-v="neumann" aria-pressed="false" title="Only the 4 cells above, below, left and right count">4-way</button>
+            </div>
+          </div>
+          <div class="field">
+            <span class="label" id="l-edge">Edges</span>
+            <div class="seg" id="segEdge" role="group" aria-labelledby="l-edge">
+              <button type="button" data-v="wrap" aria-pressed="true" title="The grid wraps around like a torus">Wrap</button>
+              <button type="button" data-v="walls" aria-pressed="false" title="Cells beyond the edge are always dead">Walls</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sec" aria-labelledby="h-run">
+        <h2 id="h-run">Run</h2>
+        <div class="btn-row">
+          <button class="btn primary grow" id="play" type="button" aria-pressed="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" id="playIcon"><path d="M6 5h4v14H6zM14 5h4v14h-4z" fill="currentColor"/></svg>
+            <span id="playLabel">Pause</span>
+          </button>
+          <button class="btn" id="step" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14l9-7zM17 5h2v14h-2z" fill="currentColor"/></svg>
+            Step
+          </button>
+        </div>
+        <div class="slider">
+          <label class="label" for="speed">Speed</label><output id="speedOut" for="speed">12 gen/s</output>
+          <input type="range" id="speed" min="1" max="60" value="12">
+        </div>
+        <div class="btn-row">
+          <button class="btn grow" id="scatter" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="7" r="2.2" fill="currentColor"/><circle cx="16" cy="5" r="2.2" fill="currentColor"/><circle cx="12" cy="13" r="2.2" fill="currentColor"/><circle cx="19" cy="15" r="2.2" fill="currentColor"/><circle cx="6" cy="19" r="2.2" fill="currentColor"/></svg>
+            Scatter
+          </button>
+          <button class="btn grow" id="clear" type="button">Clear</button>
+        </div>
+        <div class="slider">
+          <label class="label" for="density">Scatter density</label><output id="densityOut" for="density">28%</output>
+          <input type="range" id="density" min="5" max="60" value="28">
+        </div>
+      </section>
+
+      <section class="sec" aria-labelledby="h-brush">
+        <h2 id="h-brush">Draw</h2>
+        <div class="seg" id="segTool" role="group" aria-label="Drawing tool">
+          <button type="button" data-v="paint" aria-pressed="true">Paint</button>
+          <button type="button" data-v="erase" aria-pressed="false">Erase</button>
+          <button type="button" data-v="stamp" aria-pressed="false">Stamp</button>
+        </div>
+        <div class="field" id="stampRow" hidden>
+          <label class="label" for="pattern">Pattern</label>
+          <div class="preset-line">
+            <div class="select"><select id="pattern"></select></div>
+            <button class="btn icon-btn" id="rotate" type="button" aria-label="Rotate pattern" title="Rotate pattern">
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.7-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="slider" id="brushRow">
+          <label class="label" for="brush">Brush size</label><output id="brushOut" for="brush">1 cell</output>
+          <input type="range" id="brush" min="1" max="5" value="1">
+        </div>
+        <p class="note">Right-click or use Erase to remove cells. Stamped patterns are drawn for the classic rule and may behave differently under others.</p>
+      </section>
+
+      <section class="sec" aria-labelledby="h-view">
+        <h2 id="h-view">View</h2>
+        <div class="slider">
+          <label class="label" for="cellSize">Cell size</label><output id="cellOut" for="cellSize">9 px</output>
+          <input type="range" id="cellSize" min="4" max="20" value="9">
+        </div>
+        <div class="switches">
+          <label class="switch"><input type="checkbox" id="optAge" checked><span class="track"></span><span>Age colors</span></label>
+          <label class="switch"><input type="checkbox" id="optTrails" checked><span class="track"></span><span>Trails</span></label>
+          <label class="switch"><input type="checkbox" id="optGlow" checked><span class="track"></span><span>Glow</span></label>
+          <label class="switch"><input type="checkbox" id="optGuides" checked><span class="track"></span><span>Guides</span></label>
+        </div>
+        <p class="hint"><kbd>Space</kbd> run · <kbd>S</kbd> step · <kbd>R</kbd> rotate · <kbd>N</kbd> scatter · <kbd>C</kbd> clear</p>
+      </section>
+    </aside>
+  </main>
+</div>
+
+<script>
+(function () {
+'use strict';
+
+// ENGINE START
+function digitsToArr(str) {
+  const a = new Uint8Array(9);
+  for (const ch of str) a[+ch] = 1;
+  return a;
+}
+function parseRule(text) {
+  const t = String(text).toUpperCase().replace(/\s+/g, '');
+  let m = t.match(/^B([0-8]*)\/?S([0-8]*)$/);
+  if (m) return { b: digitsToArr(m[1]), s: digitsToArr(m[2]) };
+  m = t.match(/^S([0-8]*)\/?B([0-8]*)$/);
+  if (m) return { b: digitsToArr(m[2]), s: digitsToArr(m[1]) };
+  m = t.match(/^([0-8]*)\/([0-8]*)$/);
+  if (m) return { b: digitsToArr(m[2]), s: digitsToArr(m[1]) };
+  return null;
+}
+function digitsOf(a) {
+  let t = '';
+  for (let i = 0; i < a.length; i++) if (a[i]) t += i;
+  return t;
+}
+function formatRule(b, s) { return 'B' + digitsOf(b) + '/S' + digitsOf(s); }
+
+function makeGrid(w, h) {
+  const stride = w + 2, size = stride * (h + 2);
+  return {
+    w, h, stride,
+    cells: new Uint8Array(size), next: new Uint8Array(size),
+    age: new Uint8Array(size), nextAge: new Uint8Array(size),
+    trail: new Uint8Array(size)
+  };
+}
+function syncBorders(g) {
+  const { w, h, stride, cells } = g;
+  for (let x = 1; x <= w; x++) {
+    cells[x] = cells[h * stride + x];
+    cells[(h + 1) * stride + x] = cells[stride + x];
+  }
+  for (let y = 0; y <= h + 1; y++) {
+    const r = y * stride;
+    cells[r] = cells[r + w];
+    cells[r + w + 1] = cells[r + 1];
+  }
+}
+function zeroBorders(g) {
+  const { w, h, stride } = g;
+  for (const buf of [g.cells, g.next]) {
+    for (let x = 0; x <= w + 1; x++) { buf[x] = 0; buf[(h + 1) * stride + x] = 0; }
+    for (let y = 0; y <= h + 1; y++) { buf[y * stride] = 0; buf[y * stride + w + 1] = 0; }
+  }
+}
+function step(g, birth, survive, wrap, moore) {
+  const { w, h, stride, cells, next, age, nextAge, trail } = g;
+  if (wrap) syncBorders(g);
+  let pop = 0;
+  for (let y = 1; y <= h; y++) {
+    const r = y * stride;
+    for (let x = 1; x <= w; x++) {
+      const i = r + x;
+      let n = cells[i - 1] + cells[i + 1] + cells[i - stride] + cells[i + stride];
+      if (moore) n += cells[i - stride - 1] + cells[i - stride + 1] + cells[i + stride - 1] + cells[i + stride + 1];
+      const was = cells[i];
+      if (was ? survive[n] : birth[n]) {
+        next[i] = 1;
+        nextAge[i] = was ? (age[i] < 255 ? age[i] + 1 : 255) : 1;
+        if (!was) trail[i] = 0;
+        pop++;
+      } else {
+        next[i] = 0;
+        nextAge[i] = 0;
+        if (was) trail[i] = 255;
+      }
+    }
+  }
+  g.cells = next; g.next = cells;
+  g.age = nextAge; g.nextAge = age;
+  return pop;
+}
+// ENGINE END
+
+const $ = (id) => document.getElementById(id);
+const K = 12, T = 6, HIST = 240;
+
+const PRESETS = [
+  { id: 'life',       name: "Conway's Life",      rule: 'B3/S23',       note: 'The original. Gliders, oscillators and long-lived chaos.' },
+  { id: 'highlife',   name: 'HighLife',           rule: 'B36/S23',      note: 'Nearly Life, with a small pattern that copies itself.' },
+  { id: 'daynight',   name: 'Day & Night',        rule: 'B3678/S34678', note: 'Dead and alive follow mirrored rules, so inverted patterns behave the same.' },
+  { id: 'seeds',      name: 'Seeds',              rule: 'B2/S',         note: 'Every cell lasts one step. Patterns explode outward.' },
+  { id: 'lwod',       name: 'Life without Death', rule: 'B3/S012345678',note: 'Cells never die, so structures only grow.' },
+  { id: 'maze',       name: 'Maze',               rule: 'B3/S12345',    note: 'Noise grows into winding corridors.' },
+  { id: 'mazectric',  name: 'Mazectric',          rule: 'B3/S1234',     note: 'Like Maze, with longer straight corridors.' },
+  { id: 'replicator', name: 'Replicator',         rule: 'B1357/S1357',  note: 'Any pattern copies itself again and again.' },
+  { id: 'diamoeba',   name: 'Diamoeba',           rule: 'B35678/S5678', note: 'Blobs churn like amoebas.' },
+  { id: 'anneal',     name: 'Anneal',             rule: 'B4678/S35678', note: 'Noise smooths out like cooling metal.' },
+  { id: 'morley',     name: 'Morley',             rule: 'B368/S245',    note: 'Packed with spaceships. Also known as Move.' },
+  { id: 'coral',      name: 'Coral',              rule: 'B3/S45678',    note: 'Slow, branching growth like a reef.' },
+  { id: '34life',     name: '34 Life',            rule: 'B34/S34',      note: 'Small seeds explode into chaos.' },
+  { id: 'gnarl',      name: 'Gnarl',              rule: 'B1/S1',        note: 'One cell grows into a knotted fractal.' },
+  { id: 'serviettes', name: 'Serviettes',         rule: 'B234/S',       note: 'Symmetric lace patterns spread from small seeds.' },
+  { id: '2x2',        name: '2×2',                rule: 'B36/S125',     note: 'Chaos settles into blocky shapes.' }
+];
+PRESETS.forEach((p) => { const r = parseRule(p.rule); p.b = r.b; p.s = r.s; });
+
+const PATTERNS = [
+  { id: 'glider', name: 'Glider', rows: ['.O.', '..O', 'OOO'] },
+  { id: 'lwss', name: 'Lightweight spaceship', rows: ['.O..O', 'O....', 'O...O', 'OOOO.'] },
+  { id: 'pulsar', name: 'Pulsar', rows: [
+    '..OOO...OOO..', '.............', 'O....O.O....O', 'O....O.O....O', 'O....O.O....O',
+    '..OOO...OOO..', '.............', '..OOO...OOO..', 'O....O.O....O', 'O....O.O....O',
+    'O....O.O....O', '.............', '..OOO...OOO..'] },
+  { id: 'penta', name: 'Pentadecathlon', rows: ['..O....O..', 'OO.OOOO.OO', '..O....O..'] },
+  { id: 'gun', name: 'Gosper glider gun', rows: [
+    '........................O...........',
+    '......................O.O...........',
+    '............OO......OO............OO',
+    '...........O...O....OO............OO',
+    'OO........O.....O...OO..............',
+    'OO........O...O.OO....O.O...........',
+    '..........O.....O.......O...........',
+    '...........O...O....................',
+    '............OO......................'] },
+  { id: 'rpent', name: 'R-pentomino', rows: ['.OO', 'OO.', '.O.'] },
+  { id: 'acorn', name: 'Acorn', rows: ['.O.....', '...O...', 'OO..OOO'] },
+  { id: 'diehard', name: 'Diehard', rows: ['......O.', 'OO......', '.O...OOO'] }
+];
+PATTERNS.forEach((p) => {
+  p.h = p.rows.length; p.w = p.rows[0].length; p.cells = [];
+  p.rows.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] === 'O') p.cells.push([x, y]); });
+});
+
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const S = {
+  birth: parseRule('B3/S23').b, survive: parseRule('B3/S23').s,
+  wrap: true, moore: true,
+  playing: !reduceMotion, gps: 12,
+  cell: 9, density: 28,
+  tool: 'paint', brush: 1, pattern: 'glider', rot: 0,
+  ageColor: true, trails: !reduceMotion, glow: true, guides: true,
+  gen: 0, pop: 0, hist: [], grid: null, hover: null, trailAny: false
+};
+
+// ---------- DOM ----------
+const stage = $('stage'), canvas = $('board'), ctx = canvas.getContext('2d', { alpha: false });
+const sparkBody = $('sparkBody'), sparkCanvas = $('spark'), sparkCtx = sparkCanvas.getContext('2d');
+const bgCanvas = document.createElement('canvas'), bgCtx = bgCanvas.getContext('2d');
+const ruleText = $('ruleText'), ruleDisplay = $('ruleDisplay'), ruleWrap = $('ruleWrap'), ruleError = $('ruleError');
+
+let P = null, ramp = [], glowScale = 1;
+let dpr = 1, cssW = 0, cssH = 0, ox = 0, oy = 0, sparkW = 0, sparkH = 0;
+let dirty = true, statsDirty = true, lastT = 0, acc = 0;
+
+// ---------- theme ----------
+function hex(s) {
+  s = (s || '').trim();
+  let m = s.match(/^#([0-9a-f]{6})$/i);
+  if (m) { const n = parseInt(m[1], 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+  m = s.match(/^#([0-9a-f]{3})$/i);
+  if (m) { const c = m[1]; return [parseInt(c[0] + c[0], 16), parseInt(c[1] + c[1], 16), parseInt(c[2] + c[2], 16)]; }
+  return [128, 128, 128];
+}
+function readTheme() {
+  const cs = getComputedStyle(document.documentElement);
+  const v = (n) => cs.getPropertyValue(n).trim();
+  P = {
+    stage: v('--stage'), edge: v('--stage-edge'), line: v('--line'), lineStrong: v('--line-strong'),
+    birth: v('--birth'), survive: v('--survive'), warn: v('--warn'), trail: v('--trail'), fg: v('--fg')
+  };
+  const stops = [1, 2, 3, 4].map((i) => hex(v('--age-' + i)));
+  ramp = [];
+  for (let b = 0; b < K; b++) {
+    const t = (b / (K - 1)) * 3, i = Math.min(2, Math.floor(t)), f = t - i;
+    const c = [0, 1, 2].map((k) => Math.round(stops[i][k] + (stops[i + 1][k] - stops[i][k]) * f));
+    ramp.push('rgb(' + c.join(',') + ')');
+  }
+  const s = hex(P.stage);
+  const lum = (0.2126 * s[0] + 0.7152 * s[1] + 0.0722 * s[2]) / 255;
+  glowScale = lum < 0.4 ? 1 : 0.5;
+}
+
+// ---------- buckets ----------
+const ageBucket = new Uint8Array(256);
+for (let a = 1; a < 256; a++) ageBucket[a] = Math.min(K - 1, Math.floor(Math.log(a) / Math.log(1.55)));
+const trailBucket = new Uint8Array(256);
+for (let t = 1; t < 256; t++) trailBucket[t] = Math.min(T - 1, Math.floor((t - 1) / (255 / T)));
+
+// ---------- grid management ----------
+function countPop() {
+  const g = S.grid; let n = 0;
+  for (let y = 1; y <= g.h; y++) { const r = y * g.stride; for (let x = 1; x <= g.w; x++) n += g.cells[r + x]; }
+  S.pop = n;
+  return n;
+}
+function rebuildGrid(cols, rows) {
+  const old = S.grid, g = makeGrid(cols, rows);
+  if (old) {
+    const dx = Math.floor((cols - old.w) / 2), dy = Math.floor((rows - old.h) / 2);
+    for (let y = 0; y < old.h; y++) {
+      const ny = y + dy; if (ny < 0 || ny >= rows) continue;
+      for (let x = 0; x < old.w; x++) {
+        const nx = x + dx; if (nx < 0 || nx >= cols) continue;
+        const oi = (y + 1) * old.stride + x + 1, ni = (ny + 1) * g.stride + nx + 1;
+        g.cells[ni] = old.cells[oi]; g.age[ni] = old.age[oi]; g.trail[ni] = old.trail[oi];
+      }
+    }
+  }
+  S.grid = g;
+  countPop();
+  if (S.hist.length) S.hist[S.hist.length - 1] = S.pop;
+}
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  if (!w || !h) return;
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cssW = w; cssH = h;
+  canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+  layoutGrid();
+}
+function layoutGrid() {
+  const pad = 12, c = S.cell;
+  const cols = Math.max(8, Math.floor((cssW - pad * 2) / c));
+  const rows = Math.max(8, Math.floor((cssH - pad * 2) / c));
+  ox = Math.round((cssW - cols * c) / 2); oy = Math.round((cssH - rows * c) / 2);
+  if (!S.grid || S.grid.w !== cols || S.grid.h !== rows) rebuildGrid(cols, rows);
+  buildBg();
+  dirty = true; statsDirty = true;
+}
+function buildBg() {
+  if (!cssW) return;
+  bgCanvas.width = canvas.width; bgCanvas.height = canvas.height;
+  const b = bgCtx, g = S.grid, c = S.cell;
+  b.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const grad = b.createRadialGradient(cssW / 2, cssH * 0.45, Math.min(cssW, cssH) * 0.08, cssW / 2, cssH / 2, Math.hypot(cssW, cssH) * 0.62);
+  grad.addColorStop(0, P.stage); grad.addColorStop(1, P.edge);
+  b.fillStyle = grad; b.fillRect(0, 0, cssW, cssH);
+  if (S.guides) {
+    const r = Math.max(0.55, c * 0.06), p = new Path2D();
+    for (let y = 0; y < g.h; y++) for (let x = 0; x < g.w; x++) {
+      const cx = ox + x * c + c / 2, cy = oy + y * c + c / 2;
+      p.moveTo(cx + r, cy); p.arc(cx, cy, r, 0, Math.PI * 2);
+    }
+    b.globalAlpha = 0.7; b.fillStyle = P.lineStrong; b.fill(p); b.globalAlpha = 1;
+  }
+  b.strokeStyle = P.lineStrong; b.lineWidth = 1; b.globalAlpha = 0.8;
+  b.setLineDash(S.wrap ? [3, 5] : []);
+  b.strokeRect(ox - 5.5, oy - 5.5, g.w * c + 11, g.h * c + 11);
+  b.setLineDash([]); b.globalAlpha = 1;
+}
+
+// ---------- editing ----------
+function setCell(x, y, on) {
+  const g = S.grid;
+  if (x < 0 || y < 0 || x >= g.w || y >= g.h) return;
+  const i = (y + 1) * g.stride + x + 1;
+  if (on) { g.cells[i] = 1; g.age[i] = 1; g.trail[i] = 0; }
+  else { if (g.cells[i]) { g.trail[i] = 255; S.trailAny = true; } g.cells[i] = 0; g.age[i] = 0; }
+}
+function afterEdit() {
+  countPop();
+  if (!S.hist.length) S.hist.push(S.pop); else S.hist[S.hist.length - 1] = S.pop;
+  dirty = true; statsDirty = true;
+}
+function brushAt(gx, gy, on) {
+  const n = S.brush, o = Math.floor((n - 1) / 2);
+  for (let dy = 0; dy < n; dy++) for (let dx = 0; dx < n; dx++) setCell(gx - o + dx, gy - o + dy, on);
+}
+function lineCells(x0, y0, x1, y1, fn) {
+  const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+  let err = dx + dy;
+  for (;;) {
+    fn(x0, y0);
+    if (x0 === x1 && y0 === y1) break;
+    const e2 = 2 * err;
+    if (e2 >= dy) { err += dy; x0 += sx; }
+    if (e2 <= dx) { err += dx; y0 += sy; }
+  }
+}
+function stampCells() {
+  const p = PATTERNS.find((q) => q.id === S.pattern) || PATTERNS[0];
+  let cells = p.cells, w = p.w, h = p.h;
+  for (let r = 0; r < S.rot; r++) {
+    cells = cells.map(([x, y]) => [h - 1 - y, x]);
+    const t = w; w = h; h = t;
+  }
+  return { cells, w, h };
+}
+function stampAt(gx, gy) {
+  const st = stampCells(), x0 = gx - Math.floor(st.w / 2), y0 = gy - Math.floor(st.h / 2);
+  for (const [px, py] of st.cells) setCell(x0 + px, y0 + py, true);
+  afterEdit();
+}
+function clearAll() {
+  const g = S.grid;
+  g.cells.fill(0); g.next.fill(0); g.age.fill(0); g.nextAge.fill(0); g.trail.fill(0);
+  S.gen = 0; S.pop = 0; S.hist = [0]; S.trailAny = false;
+  dirty = true; statsDirty = true;
+}
+function scatter() {
+  clearAll();
+  const g = S.grid, d = S.density / 100;
+  for (let y = 1; y <= g.h; y++) for (let x = 1; x <= g.w; x++) {
+    if (Math.random() < d) { const i = y * g.stride + x; g.cells[i] = 1; g.age[i] = 1; }
+  }
+  countPop();
+  S.hist = [S.pop];
+}
+function stepOnce() {
+  S.pop = step(S.grid, S.birth, S.survive, S.wrap, S.moore);
+  S.gen++;
+  S.hist.push(S.pop);
+  if (S.hist.length > HIST) S.hist.shift();
+  S.trailAny = true;
+  dirty = true; statsDirty = true;
+}
+
+// ---------- rendering ----------
+function addRR(target, x, y, s, r) {
+  if (target.roundRect) target.roundRect(x, y, s, s, r); else target.rect(x, y, s, s);
+}
+function render() {
+  const g = S.grid;
+  if (!g || !cssW || !P) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(bgCanvas, 0, 0);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const c = S.cell;
+  const gap = c >= 12 ? 2 : c >= 8 ? 1.5 : c >= 6 ? 1 : 0.6;
+  const sz = c - gap, rad = sz * 0.3, off = gap / 2;
+  const e1 = sz * 0.45, e2 = sz * 0.95;
+  const glow = S.glow && c >= 5;
+
+  const ageP = [], trailP = [], h1 = [], h2 = [];
+  for (let b = 0; b < K; b++) ageP.push(new Path2D());
+  for (let t = 0; t < T; t++) trailP.push(new Path2D());
+  for (let b = 0; b < 3; b++) { h1.push(new Path2D()); h2.push(new Path2D()); }
+
+  const { cells, age, trail, stride } = g;
+  const showTrails = S.trails;
+  for (let y = 0; y < g.h; y++) {
+    const row = (y + 1) * stride + 1, py = oy + y * c + off;
+    for (let x = 0; x < g.w; x++) {
+      const i = row + x, px = ox + x * c + off;
+      if (cells[i]) {
+        const b = S.ageColor ? ageBucket[age[i]] : 2;
+        addRR(ageP[b], px, py, sz, rad);
+        if (glow && b < 3) {
+          addRR(h1[b], px - e1, py - e1, sz + e1 * 2, rad + e1);
+          addRR(h2[b], px - e2, py - e2, sz + e2 * 2, rad + e2);
+        }
+      } else if (showTrails && trail[i]) {
+        addRR(trailP[trailBucket[trail[i]]], px, py, sz, rad);
+      }
+    }
+  }
+
+  if (glow) {
+    for (let b = 0; b < 3; b++) {
+      ctx.fillStyle = ramp[S.ageColor ? b : 2];
+      ctx.globalAlpha = 0.05 * glowScale; ctx.fill(h2[b]);
+      ctx.globalAlpha = 0.11 * glowScale; ctx.fill(h1[b]);
+    }
+  }
+  if (showTrails) {
+    ctx.fillStyle = P.trail;
+    for (let t = 0; t < T; t++) { ctx.globalAlpha = 0.08 + t * 0.08; ctx.fill(trailP[t]); }
+  }
+  ctx.globalAlpha = 1;
+  for (let b = 0; b < K; b++) { ctx.fillStyle = ramp[b]; ctx.fill(ageP[b]); }
+
+  drawGhost(sz, rad, off);
+}
+function drawGhost(sz, rad, off) {
+  if (!S.hover) return;
+  const g = S.grid, c = S.cell, { gx, gy } = S.hover;
+  if (S.tool === 'stamp') {
+    const st = stampCells(), x0 = gx - Math.floor(st.w / 2), y0 = gy - Math.floor(st.h / 2);
+    const p = new Path2D();
+    for (const [px, py] of st.cells) {
+      const X = x0 + px, Y = y0 + py;
+      if (X < 0 || Y < 0 || X >= g.w || Y >= g.h) continue;
+      addRR(p, ox + X * c + off, oy + Y * c + off, sz, rad);
+    }
+    ctx.globalAlpha = 0.65; ctx.fillStyle = P.birth; ctx.fill(p);
+    ctx.globalAlpha = 0.5; ctx.strokeStyle = P.birth; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+    ctx.strokeRect(ox + x0 * c - 1.5, oy + y0 * c - 1.5, st.w * c + 3, st.h * c + 3);
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+  } else {
+    const n = S.brush, o = Math.floor((n - 1) / 2), x = gx - o, y = gy - o;
+    const col = S.tool === 'erase' ? P.warn : P.birth;
+    ctx.fillStyle = col; ctx.globalAlpha = 0.14;
+    ctx.fillRect(ox + x * c, oy + y * c, n * c, n * c);
+    ctx.globalAlpha = 0.9; ctx.strokeStyle = col; ctx.lineWidth = 1.5;
+    ctx.strokeRect(ox + x * c + 0.75, oy + y * c + 0.75, n * c - 1.5, n * c - 1.5);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function setText(el, t) { if (el.textContent !== t) el.textContent = t; }
+function updateStats() {
+  const g = S.grid; if (!g) return;
+  const fmt = (n) => n.toLocaleString('en-US');
+  setText($('statGen'), fmt(S.gen));
+  setText($('statPop'), fmt(S.pop));
+  setText($('statDen'), (S.pop / (g.w * g.h) * 100).toFixed(1) + '%');
+  setText($('statGrid'), g.w + ' × ' + g.h);
+  let peak = 0; for (const v of S.hist) if (v > peak) peak = v;
+  setText($('statPeak'), 'peak ' + fmt(peak));
+  $('emptyNote').hidden = S.pop > 0;
+  drawSpark(peak);
+}
+function sizeSpark() {
+  const w = sparkBody.clientWidth, h = sparkBody.clientHeight;
+  if (!w || !h) return;
+  sparkW = w; sparkH = h;
+  sparkCanvas.width = Math.round(w * dpr); sparkCanvas.height = Math.round(h * dpr);
+  statsDirty = true;
+}
+function drawSpark(peak) {
+  if (!sparkW || !P) return;
+  const x = sparkCtx, w = sparkW, h = sparkH;
+  x.setTransform(dpr, 0, 0, dpr, 0, 0);
+  x.clearRect(0, 0, w, h);
+  const padT = 6, padB = 4, padX = 5, ih = h - padT - padB, iw = w - padX * 2;
+  const max = Math.max(1, peak), hist = S.hist, n = hist.length;
+  x.strokeStyle = P.line; x.lineWidth = 1;
+  for (const f of [0, 0.5, 1]) {
+    const yy = Math.round(padT + ih * (1 - f)) + 0.5;
+    x.beginPath(); x.moveTo(padX, yy); x.lineTo(w - padX, yy); x.stroke();
+  }
+  if (!n) return;
+  const px = (k) => padX + iw * (k / (HIST - 1));
+  const py = (v) => padT + ih * (1 - v / max);
+  x.beginPath();
+  hist.forEach((v, k) => { if (k) x.lineTo(px(k), py(v)); else x.moveTo(px(k), py(v)); });
+  x.lineJoin = 'round'; x.lineWidth = 1.6; x.strokeStyle = P.birth; x.stroke();
+  x.lineTo(px(n - 1), padT + ih); x.lineTo(px(0), padT + ih); x.closePath();
+  x.globalAlpha = 0.16; x.fillStyle = P.birth; x.fill(); x.globalAlpha = 1;
+  const ex = px(n - 1), ey = py(hist[n - 1]);
+  x.beginPath(); x.arc(ex, ey, 3.4, 0, Math.PI * 2); x.fillStyle = P.birth; x.fill();
+  x.lineWidth = 1.5; x.strokeStyle = P.stage; x.stroke();
+}
+
+// ---------- animation loop ----------
+function frame(t) {
+  const dt = Math.min(0.1, (t - lastT) / 1000 || 0); lastT = t;
+  if (S.playing && S.grid) {
+    acc += dt * S.gps;
+    let n = 0;
+    while (acc >= 1 && n < 6) { stepOnce(); acc -= 1; n++; }
+    if (acc >= 1) acc = 0;
+  }
+  if (S.trailAny) {
+    const g = S.grid, tr = g.trail; let any = false;
+    for (let y = 1; y <= g.h; y++) {
+      const r = y * g.stride;
+      for (let x = 1; x <= g.w; x++) {
+        const v = tr[r + x];
+        if (v) { const nv = (v * 238) >> 8; tr[r + x] = nv < 6 ? 0 : nv; if (tr[r + x]) any = true; }
+      }
+    }
+    S.trailAny = any; dirty = true;
+  }
+  if (dirty) { render(); dirty = false; }
+  if (statsDirty) { updateStats(); statsDirty = false; }
+  requestAnimationFrame(frame);
+}
+
+// ---------- rule UI ----------
+const esc = (c) => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : c);
+function paintRule(text) {
+  let mode = null, out = '';
+  for (const ch of text) {
+    const u = ch.toUpperCase();
+    if (u === 'B') mode = 'b';
+    else if (u === 'S') mode = 's';
+    if (ch === '/') out += '<span class="c-x">/</span>';
+    else out += mode ? '<span class="c-' + mode + '">' + esc(ch) + '</span>' : esc(ch);
+  }
+  ruleDisplay.innerHTML = out;
+}
+function numsOf(a) { const n = []; for (let i = 0; i < a.length; i++) if (a[i]) n.push(i); return n; }
+function phrase(ns, kind) {
+  const nums = ns.map((n) => '<b class="c-' + kind + '">' + n + '</b>');
+  const joined = nums.length === 1 ? nums[0] : nums.slice(0, -1).join(', ') + ' or ' + nums[nums.length - 1];
+  return joined + (ns.length === 1 && ns[0] === 1 ? ' neighbor' : ' neighbors');
+}
+function describeRule() {
+  const b = numsOf(S.birth), s = numsOf(S.survive);
+  const bs = b.length === 0 ? 'No cell is ever born.' : b.length === 9 ? 'Every dead cell comes alive.' : 'A dead cell with ' + phrase(b, 'b') + ' comes alive.';
+  const ss = s.length === 0 ? 'Every live cell dies each step.' : s.length === 9 ? 'Every live cell survives.' : 'A live cell with ' + phrase(s, 's') + ' survives.';
+  $('ruleSentence').innerHTML = bs + ' ' + ss;
+}
+function buildDigits() {
+  for (const kind of ['birth', 'survive']) {
+    const wrap = document.querySelector('[data-kind="' + kind + '"] .digits');
+    for (let n = 0; n <= 8; n++) {
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'digit'; btn.textContent = n; btn.dataset.n = n;
+      btn.setAttribute('aria-pressed', 'false');
+      btn.setAttribute('aria-label', (kind === 'birth' ? 'Birth' : 'Survive') + ' with ' + n + (n === 1 ? ' neighbor' : ' neighbors'));
+      btn.addEventListener('click', () => { S[kind][n] = S[kind][n] ? 0 : 1; ruleChanged('buttons'); });
+      wrap.appendChild(btn);
+    }
+  }
+}
+function syncDigits() {
+  for (const kind of ['birth', 'survive']) {
+    document.querySelectorAll('[data-kind="' + kind + '"] .digit').forEach((btn) => {
+      const n = +btn.dataset.n;
+      btn.setAttribute('aria-pressed', S[kind][n] ? 'true' : 'false');
+      btn.disabled = !S.moore && n > 4;
+    });
+  }
+}
+function syncPreset() {
+  const sel = $('preset');
+  const match = PRESETS.find((p) => p.b.every((v, i) => v === S.birth[i]) && p.s.every((v, i) => v === S.survive[i]));
+  sel.value = match ? match.id : 'custom';
+  $('presetNote').textContent = match ? match.note : 'Your own rule. Change one number at a time to see what shifts.';
+}
+function setInvalid(bad) { ruleWrap.classList.toggle('bad', bad); ruleError.hidden = !bad; }
+function ruleChanged(src) {
+  if (src !== 'text') ruleText.value = formatRule(S.birth, S.survive);
+  paintRule(ruleText.value);
+  syncDigits(); describeRule(); syncPreset(); setInvalid(false);
+}
+function applyPreset(id) {
+  const p = PRESETS.find((q) => q.id === id);
+  if (!p) return;
+  S.birth = Uint8Array.from(p.b); S.survive = Uint8Array.from(p.s);
+  setMoore(true);
+  ruleChanged('preset');
+}
+function randomRule() {
+  const max = S.moore ? 8 : 4;
+  const b = new Uint8Array(9), s = new Uint8Array(9);
+  for (let n = 1; n <= max; n++) { b[n] = Math.random() < 0.3 ? 1 : 0; s[n] = Math.random() < 0.42 ? 1 : 0; }
+  if (Math.random() < 0.1) s[0] = 1;
+  if (!numsOf(b).length) b[Math.min(3, max)] = 1;
+  S.birth = b; S.survive = s;
+  ruleChanged('random');
+}
+
+ruleText.addEventListener('input', () => {
+  const r = parseRule(ruleText.value);
+  paintRule(ruleText.value);
+  if (r) { S.birth = r.b; S.survive = r.s; syncDigits(); describeRule(); syncPreset(); setInvalid(false); }
+  else setInvalid(ruleText.value.trim() !== '');
+});
+ruleText.addEventListener('blur', () => { ruleChanged('blur'); });
+ruleText.addEventListener('keydown', (e) => { if (e.key === 'Enter') ruleText.blur(); });
+
+// ---------- controls ----------
+function bindSeg(id, onPick) {
+  const root = $(id);
+  root.querySelectorAll('button').forEach((btn) => {
+    btn.addEventListener('click', () => onPick(btn.dataset.v));
+  });
+}
+function markSeg(id, value) {
+  $(id).querySelectorAll('button').forEach((btn) => btn.setAttribute('aria-pressed', btn.dataset.v === value ? 'true' : 'false'));
+}
+function setMoore(v) { S.moore = v; markSeg('segHood', v ? 'moore' : 'neumann'); syncDigits(); }
+function setWrap(v) {
+  S.wrap = v; markSeg('segEdge', v ? 'wrap' : 'walls');
+  if (!v && S.grid) zeroBorders(S.grid);
+  buildBg(); dirty = true;
+}
+function setPlaying(v) {
+  S.playing = v; acc = 0;
+  $('play').setAttribute('aria-pressed', v ? 'true' : 'false');
+  $('playLabel').textContent = v ? 'Pause' : 'Play';
+  $('playIcon').innerHTML = v ? '<path d="M6 5h4v14H6zM14 5h4v14h-4z" fill="currentColor"/>' : '<path d="M7 5v14l12-7z" fill="currentColor"/>';
+}
+function setTool(v) {
+  S.tool = v; markSeg('segTool', v);
+  $('stampRow').hidden = v !== 'stamp';
+  $('brushRow').hidden = v === 'stamp';
+  dirty = true;
+}
+function bindRange(id, outId, fmt, apply) {
+  const el = $(id), out = $(outId);
+  const run = () => { out.textContent = fmt(+el.value); apply(+el.value); };
+  el.addEventListener('input', run);
+  run();
+}
+
+function build() {
+  buildDigits();
+  const preset = $('preset');
+  PRESETS.forEach((p) => { const o = document.createElement('option'); o.value = p.id; o.textContent = p.name + '  ' + p.rule; preset.appendChild(o); });
+  const custom = document.createElement('option'); custom.value = 'custom'; custom.textContent = 'Custom rule'; preset.appendChild(custom);
+  preset.addEventListener('change', () => { if (preset.value !== 'custom') applyPreset(preset.value); });
+  $('surprise').addEventListener('click', randomRule);
+
+  const pat = $('pattern');
+  PATTERNS.forEach((p) => { const o = document.createElement('option'); o.value = p.id; o.textContent = p.name; pat.appendChild(o); });
+  pat.addEventListener('change', () => { S.pattern = pat.value; S.rot = 0; dirty = true; });
+  $('rotate').addEventListener('click', () => { S.rot = (S.rot + 1) % 4; dirty = true; });
+
+  bindSeg('segHood', (v) => setMoore(v === 'moore'));
+  bindSeg('segEdge', (v) => setWrap(v === 'wrap'));
+  bindSeg('segTool', setTool);
+
+  $('play').addEventListener('click', () => setPlaying(!S.playing));
+  $('step').addEventListener('click', () => { setPlaying(false); stepOnce(); });
+  $('scatter').addEventListener('click', () => { scatter(); });
+  $('clear').addEventListener('click', clearAll);
+
+  bindRange('speed', 'speedOut', (v) => v + ' gen/s', (v) => { S.gps = v; });
+  bindRange('density', 'densityOut', (v) => v + '%', (v) => { S.density = v; });
+  bindRange('brush', 'brushOut', (v) => v + (v === 1 ? ' cell' : ' cells'), (v) => { S.brush = v; dirty = true; });
+  bindRange('cellSize', 'cellOut', (v) => v + ' px', (v) => { S.cell = v; if (cssW) layoutGrid(); });
+
+  const sw = (id, key, after) => $(id).addEventListener('change', (e) => { S[key] = e.target.checked; if (after) after(); dirty = true; });
+  sw('optAge', 'ageColor'); sw('optTrails', 'trails'); sw('optGlow', 'glow'); sw('optGuides', 'guides', buildBg);
+  $('optTrails').checked = S.trails;
+
+  ruleChanged('init');
+  setPlaying(S.playing);
+  setTool('paint');
+}
+
+// ---------- pointer input ----------
+let painting = null, lastCell = null;
+function cellAt(e) {
+  const r = canvas.getBoundingClientRect();
+  const x = e.clientX - r.left - ox, y = e.clientY - r.top - oy;
+  return { gx: Math.floor(x / S.cell), gy: Math.floor(y / S.cell) };
+}
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+canvas.addEventListener('pointerdown', (e) => {
+  if (!S.grid) return;
+  const { gx, gy } = cellAt(e);
+  S.hover = { gx, gy };
+  if (S.tool === 'stamp') {
+    if (e.button === 0 || e.pointerType !== 'mouse') stampAt(gx, gy);
+    return;
+  }
+  canvas.setPointerCapture(e.pointerId);
+  painting = (e.button === 2 || S.tool === 'erase') ? 'erase' : 'paint';
+  lastCell = { gx, gy };
+  brushAt(gx, gy, painting === 'paint');
+  afterEdit();
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (!S.grid) return;
+  const { gx, gy } = cellAt(e);
+  S.hover = { gx, gy }; dirty = true;
+  if (painting && lastCell) {
+    lineCells(lastCell.gx, lastCell.gy, gx, gy, (x, y) => brushAt(x, y, painting === 'paint'));
+    lastCell = { gx, gy };
+    afterEdit();
+  }
+});
+function endPaint(e) {
+  painting = null; lastCell = null;
+  if (e.pointerType && e.pointerType !== 'mouse') { S.hover = null; dirty = true; }
+}
+canvas.addEventListener('pointerup', endPaint);
+canvas.addEventListener('pointercancel', endPaint);
+canvas.addEventListener('pointerleave', () => { if (!painting) { S.hover = null; dirty = true; } });
+
+// ---------- keyboard ----------
+document.addEventListener('keydown', (e) => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const t = e.target;
+  if (t && t.matches && t.matches('input[type="text"], select, textarea')) return;
+  switch (e.key) {
+    case ' ':
+      if (t && t.tagName === 'BUTTON') return;
+      e.preventDefault(); setPlaying(!S.playing); break;
+    case 's': case 'S': setPlaying(false); stepOnce(); break;
+    case 'r': case 'R': S.rot = (S.rot + 1) % 4; dirty = true; break;
+    case 'c': case 'C': clearAll(); break;
+    case 'n': case 'N': scatter(); break;
+    default: return;
+  }
+});
+
+// ---------- boot ----------
+readTheme();
+build();
+resize();
+sizeSpark();
+scatter();
+statsDirty = true;
+
+if (window.ResizeObserver) {
+  new ResizeObserver(() => { resize(); sizeSpark(); }).observe(stage);
+  new ResizeObserver(sizeSpark).observe(sparkBody);
+} else {
+  window.addEventListener('resize', () => { resize(); sizeSpark(); });
+}
+function themeChanged() { readTheme(); buildBg(); dirty = true; statsDirty = true; }
+if (window.matchMedia) {
+  const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  if (mq.addEventListener) mq.addEventListener('change', themeChanged);
+}
+new MutationObserver(themeChanged).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class', 'style'] });
+
+requestAnimationFrame(frame);
+})();
+</script>
+
+</body>
+</html>
