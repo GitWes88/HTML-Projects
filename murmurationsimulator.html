@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Starling Murmuration Simulation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: #030712;
+            color: #f3f4f6;
+        }
+
+        input[type=range] {
+            accent-color: #38bdf8;
+            width: 100%;
+            height: 4px;
+            background: #334155;
+            border-radius: 2px;
+            cursor: pointer;
+        }
+
+        /* Custom scrollbar for sidebar */
+        ::-webkit-scrollbar {
+            width: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="flex h-screen w-screen overflow-hidden select-none bg-slate-950">
+
+    <!-- Sidebar Controls -->
+    <div class="w-80 h-full bg-slate-900/95 border-r border-slate-800 p-4 flex flex-col justify-between z-20 shadow-2xl backdrop-blur shrink-0 overflow-y-auto">
+        <div class="space-y-4">
+            <div>
+                <h1 class="text-lg font-bold text-sky-400 tracking-tight flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                    Starling Murmuration
+                </h1>
+                <p class="text-xs text-slate-400 mt-0.5">Realistic Flock Emergence Engine</p>
+            </div>
+
+            <div class="space-y-3 text-xs">
+                
+                <!-- Visual Theme Switcher -->
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-300 mb-1 uppercase tracking-wider">Visual Contrast Mode</label>
+                    <select id="paramTheme" class="w-full bg-slate-800 border border-slate-700 text-sky-300 rounded-md p-1.5 text-xs font-medium focus:outline-none focus:border-sky-500">
+                        <option value="highContrast" selected>🌓 High Contrast Dusk (Crisp Black)</option>
+                        <option value="twilightSunset">🌅 Twilight Gold (Sunset Glow)</option>
+                        <option value="neonCyber">⚡ Neon Sky (Glow Birds)</option>
+                        <option value="midnight">🌌 Deep Midnight (Bright Birds)</option>
+                    </select>
+                </div>
+
+                <!-- Camera Zoom Slider -->
+                <div class="bg-slate-800/60 p-2.5 rounded-lg border border-slate-700/50">
+                    <div class="flex justify-between text-slate-200 mb-1 font-semibold">
+                        <span>🔍 Camera Zoom</span>
+                        <span id="zoomVal" class="font-mono text-sky-400">1.0x</span>
+                    </div>
+                    <input type="range" id="paramZoom" min="0.2" max="3.0" step="0.05" value="1.0">
+                    <p class="text-[10px] text-slate-400 mt-1">Tip: Use mouse wheel on canvas to zoom in/out</p>
+                </div>
+
+                <!-- Population -->
+                <div>
+                    <div class="flex justify-between text-slate-300 mb-1">
+                        <span>Population</span>
+                        <span id="popVal" class="font-mono text-sky-400">700</span>
+                    </div>
+                    <input type="range" id="paramPopulation" min="50" max="1500" step="50" value="700">
+                </div>
+
+                <!-- Bird Scale -->
+                <div>
+                    <div class="flex justify-between text-slate-300 mb-1">
+                        <span>Bird Display Size</span>
+                        <span id="sizeVal" class="font-mono text-sky-400">1.8x</span>
+                    </div>
+                    <input type="range" id="paramSize" min="0.8" max="4.0" step="0.2" value="1.8">
+                </div>
+
+                <!-- Flight Speed -->
+                <div>
+                    <div class="flex justify-between text-slate-300 mb-1">
+                        <span>Max Flight Speed</span>
+                        <span id="speedVal" class="font-mono text-sky-400">5.0</span>
+                    </div>
+                    <input type="range" id="paramSpeed" min="2.0" max="10.0" step="0.5" value="5.0">
+                </div>
+
+                <!-- Cohesion -->
+                <div>
+                    <div class="flex justify-between text-slate-300 mb-1">
+                        <span>Cohesion (Flock Attraction)</span>
+                        <span id="cohVal" class="font-mono text-sky-400">1.0</span>
+                    </div>
+                    <input type="range" id="paramCohesion" min="0.1" max="3.0" step="0.1" value="1.0">
+                </div>
+
+                <!-- Alignment -->
+                <div>
+                    <div class="flex justify-between text-slate-300 mb-1">
+                        <span>Alignment (Matching Heading)</span>
+                        <span id="aliVal" class="font-mono text-sky-400">1.5</span>
+                    </div>
+                    <input type="range" id="paramAlignment" min="0.1" max="3.0" step="0.1" value="1.5">
+                </div>
+
+                <!-- Separation -->
+                <div>
+                    <div class="flex justify-between text-slate-300 mb-1">
+                        <span>Separation (Personal Space)</span>
+                        <span id="sepVal" class="font-mono text-sky-400">1.5</span>
+                    </div>
+                    <input type="range" id="paramSeparation" min="0.1" max="3.0" step="0.1" value="1.5">
+                </div>
+
+                <!-- Interactive Cursor Mode -->
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-300 mb-1 uppercase tracking-wider">Cursor Interaction</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="btnPredator" class="py-1.5 px-2 rounded border bg-rose-950/80 border-rose-600 text-rose-300 text-xs font-semibold hover:bg-rose-900 transition">
+                            🦅 Falcon
+                        </button>
+                        <button id="btnAttractor" class="py-1.5 px-2 rounded border bg-slate-800 border-slate-700 text-slate-300 text-xs font-semibold hover:bg-slate-700 transition">
+                            🧲 Roost Pull
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="pt-3 border-t border-slate-800 flex gap-2">
+            <button id="btnReset" class="w-full py-2 bg-sky-600 hover:bg-sky-500 text-white font-semibold rounded-lg text-xs transition shadow-lg shadow-sky-950">
+                🔄 Re-Initialize Flock
+            </button>
+        </div>
+    </div>
+
+    <!-- Canvas Container -->
+    <div class="relative flex-1 h-full w-full bg-black overflow-hidden">
+        
+        <!-- On-Screen Status HUD -->
+        <div class="absolute top-4 right-4 z-10 bg-slate-900/80 backdrop-blur border border-slate-700 px-3 py-1.5 rounded-lg text-xs font-mono text-slate-200 flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span id="statusText">Status: Initializing...</span>
+        </div>
+
+        <!-- Touch / Mouse Instruction Banner -->
+        <div class="absolute bottom-4 right-4 z-10 bg-slate-900/60 backdrop-blur border border-slate-800 px-3 py-1.5 rounded-md text-[11px] text-slate-400 pointer-events-none">
+            Click/Drag to chase birds • Scroll Wheel to Zoom Out/In
+        </div>
+
+        <canvas id="simCanvas" class="w-full h-full block cursor-crosshair"></canvas>
+    </div>
+
+    <script>
+        // Guaranteed Execution Wrapper
+        window.onload = function() {
+            const canvas = document.getElementById('simCanvas');
+            const ctx = canvas.getContext('2d');
+            const statusText = document.getElementById('statusText');
+
+            let width = canvas.width = canvas.clientWidth || window.innerWidth - 320;
+            let height = canvas.height = canvas.clientHeight || window.innerHeight;
+
+            // Simulation Config & Parameters
+            const params = {
+                population: 700,
+                birdScale: 1.8,
+                maxSpeed: 5.0,
+                maxForce: 0.15,
+                cohesion: 1.0,
+                alignment: 1.5,
+                separation: 1.5,
+                zoom: 1.0,
+                theme: 'highContrast',
+                mouseMode: 'predator'
+            };
+
+            // Mouse / Touch Interaction State
+            const mouse = {
+                x: width / 2,
+                y: height / 2,
+                active: false
+            };
+
+            // Boid Structure (Simple Arrays for Speed and Zero Garbage Collection)
+            let boids = [];
+
+            function createBoid() {
+                return {
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    vx: (Math.random() - 0.5) * params.maxSpeed,
+                    vy: (Math.random() - 0.5) * params.maxSpeed,
+                    ax: 0,
+                    ay: 0,
+                    wing: Math.random() * Math.PI * 2,
+                    wingSpeed: 0.15 + Math.random() * 0.1
+                };
+            }
+
+            function initFlock(count) {
+                boids = [];
+                for (let i = 0; i < count; i++) {
+                    boids.push(createBoid());
+                }
+            }
+
+            // Window Resizing
+            function handleResize() {
+                width = canvas.width = canvas.clientWidth || window.innerWidth - 320;
+                height = canvas.height = canvas.clientHeight || window.innerHeight;
+            }
+            window.addEventListener('resize', handleResize);
+
+            // Boid Physics Calculations
+            function updatePhysics() {
+                const count = boids.length;
+                const neighborDist = 65 * 65; // Squared distance for fast comparison
+                const sepDist = 25 * 25;
+                const maxSpeed = params.maxSpeed;
+                const maxForce = params.maxForce;
+
+                for (let i = 0; i < count; i++) {
+                    const b = boids[i];
+                    let cohX = 0, cohY = 0, cohCount = 0;
+                    let aliX = 0, aliY = 0, aliCount = 0;
+                    let sepX = 0, sepY = 0, sepCount = 0;
+
+                    // Flap wings
+                    b.wing += b.wingSpeed;
+
+                    // Compare with subset of neighbors for maximum efficiency & non-choppy physics
+                    for (let j = 0; j < count; j++) {
+                        if (i === j) continue;
+                        const other = boids[j];
+
+                        const dx = other.x - b.x;
+                        const dy = other.y - b.y;
+                        const d2 = dx * dx + dy * dy;
+
+                        if (d2 < neighborDist && d2 > 0) {
+                            // Cohesion
+                            cohX += other.x;
+                            cohY += other.y;
+                            cohCount++;
+
+                            // Alignment
+                            aliX += other.vx;
+                            aliY += other.vy;
+                            aliCount++;
+
+                            // Separation
+                            if (d2 < sepDist) {
+                                const dist = Math.sqrt(d2) || 1;
+                                sepX -= dx / dist;
+                                sepY -= dy / dist;
+                                sepCount++;
+                            }
+                        }
+                    }
+
+                    // Calculate Steering Forces
+                    let steeringX = 0;
+                    let steeringY = 0;
+
+                    if (cohCount > 0) {
+                        cohX /= cohCount;
+                        cohY /= cohCount;
+                        const dirX = cohX - b.x;
+                        const dirY = cohY - b.y;
+                        steeringX += dirX * 0.005 * params.cohesion;
+                        steeringY += dirY * 0.005 * params.cohesion;
+                    }
+
+                    if (aliCount > 0) {
+                        aliX /= aliCount;
+                        aliY /= aliCount;
+                        steeringX += (aliX - b.vx) * 0.04 * params.alignment;
+                        steeringY += (aliY - b.vy) * 0.04 * params.alignment;
+                    }
+
+                    if (sepCount > 0) {
+                        steeringX += sepX * 0.2 * params.separation;
+                        steeringY += sepY * 0.2 * params.separation;
+                    }
+
+                    // Mouse Interaction
+                    if (mouse.active) {
+                        const mdx = mouse.x - b.x;
+                        const mdy = mouse.y - b.y;
+                        const md2 = mdx * mdx + mdy * mdy;
+                        if (md2 < 200 * 200) {
+                            const mdist = Math.sqrt(md2) || 1;
+                            if (params.mouseMode === 'predator') {
+                                // Flee predator
+                                steeringX -= (mdx / mdist) * 1.2;
+                                steeringY -= (mdy / mdist) * 1.2;
+                            } else {
+                                // Attract roost
+                                steeringX += (mdx / mdist) * 0.4;
+                                steeringY += (mdy / mdist) * 0.4;
+                            }
+                        }
+                    }
+
+                    // Screen Bounds Turning Force (Keep in visible sky box)
+                    const margin = 80;
+                    if (b.x < margin) steeringX += 0.3;
+                    if (b.x > width - margin) steeringX -= 0.3;
+                    if (b.y < margin) steeringY += 0.3;
+                    if (b.y > height - margin) steeringY -= 0.3;
+
+                    // Limit Force & Velocity
+                    b.vx += Math.max(-maxForce, Math.min(maxForce, steeringX));
+                    b.vy += Math.max(-maxForce, Math.min(maxForce, steeringY));
+
+                    const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy) || 1;
+                    if (speed > maxSpeed) {
+                        b.vx = (b.vx / speed) * maxSpeed;
+                        b.vy = (b.vy / speed) * maxSpeed;
+                    } else if (speed < 1.5) {
+                        b.vx = (b.vx / speed) * 1.5;
+                        b.vy = (b.vy / speed) * 1.5;
+                    }
+
+                    // Update Position
+                    b.x += b.vx;
+                    b.y += b.vy;
+                }
+            }
+
+            // High Contrast Render Pass
+            function render() {
+                ctx.save();
+
+                // Clear & Apply Theme Background Gradient
+                if (params.theme === 'highContrast') {
+                    const skyGrad = ctx.createLinearGradient(0, 0, 0, height);
+                    skyGrad.addColorStop(0.0, '#0f172a');
+                    skyGrad.addColorStop(0.6, '#334155');
+                    skyGrad.addColorStop(1.0, '#94a3b8');
+                    ctx.fillStyle = skyGrad;
+                    ctx.fillRect(0, 0, width, height);
+                } else if (params.theme === 'twilightSunset') {
+                    const skyGrad = ctx.createLinearGradient(0, 0, 0, height);
+                    skyGrad.addColorStop(0.0, '#090d16');
+                    skyGrad.addColorStop(0.5, '#4c1d95');
+                    skyGrad.addColorStop(0.8, '#c026d3');
+                    skyGrad.addColorStop(1.0, '#f59e0b');
+                    ctx.fillStyle = skyGrad;
+                    ctx.fillRect(0, 0, width, height);
+                } else if (params.theme === 'neonCyber') {
+                    ctx.fillStyle = '#050515';
+                    ctx.fillRect(0, 0, width, height);
+                } else if (params.theme === 'midnight') {
+                    const skyGrad = ctx.createLinearGradient(0, 0, 0, height);
+                    skyGrad.addColorStop(0.0, '#020208');
+                    skyGrad.addColorStop(1.0, '#0f172a');
+                    ctx.fillStyle = skyGrad;
+                    ctx.fillRect(0, 0, width, height);
+                }
+
+                // Apply Camera Zoom centered on window
+                const zoom = params.zoom;
+                ctx.translate(width / 2, height / 2);
+                ctx.scale(zoom, zoom);
+                ctx.translate(-width / 2, -height / 2);
+
+                // Draw Cursor Marker
+                if (mouse.active) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(mouse.x, mouse.y, 180, 0, Math.PI * 2);
+                    ctx.strokeStyle = params.mouseMode === 'predator' ? 'rgba(244, 63, 94, 0.4)' : 'rgba(56, 189, 248, 0.4)';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    ctx.restore();
+                }
+
+                // Draw Boids
+                const birdScale = params.birdScale;
+                const count = boids.length;
+
+                for (let i = 0; i < count; i++) {
+                    const b = boids[i];
+                    const angle = Math.atan2(b.vy, b.vx);
+                    const flap = Math.sin(b.wing);
+
+                    ctx.save();
+                    ctx.translate(b.x, b.y);
+                    ctx.rotate(angle);
+                    ctx.scale(birdScale, birdScale);
+
+                    // High Contrast Styling
+                    if (params.theme === 'highContrast') {
+                        ctx.fillStyle = '#000000';
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.lineWidth = 0.5;
+                    } else if (params.theme === 'twilightSunset') {
+                        ctx.fillStyle = '#0f051d';
+                        ctx.strokeStyle = '#fde047';
+                        ctx.lineWidth = 0.5;
+                    } else if (params.theme === 'neonCyber') {
+                        ctx.fillStyle = '#38bdf8';
+                        ctx.strokeStyle = '#bae6fd';
+                        ctx.lineWidth = 0.8;
+                    } else if (params.theme === 'midnight') {
+                        ctx.fillStyle = '#f8fafc';
+                        ctx.strokeStyle = '#94a3b8';
+                        ctx.lineWidth = 0.5;
+                    }
+
+                    // Crisp Starling Polygon Shape
+                    ctx.beginPath();
+                    ctx.moveTo(4, 0);
+                    ctx.lineTo(-2, -3 - flap * 3);
+                    ctx.lineTo(-4, 0);
+                    ctx.lineTo(-2, 3 + flap * 3);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.restore();
+                }
+
+                ctx.restore();
+            }
+
+            // Main Frame Loop with FPS Tracking
+            let lastTime = performance.now();
+            let frameCount = 0;
+            let fps = 60;
+
+            function animLoop(now) {
+                frameCount++;
+                if (now - lastTime >= 500) {
+                    fps = Math.round((frameCount * 1000) / (now - lastTime));
+                    statusText.innerText = `Status: Running (${fps} FPS) | Birds: ${boids.length}`;
+                    frameCount = 0;
+                    lastTime = now;
+                }
+
+                updatePhysics();
+                render();
+
+                requestAnimationFrame(animLoop);
+            }
+
+            // Hook Event Listeners to UI Elements
+            const popInput = document.getElementById('paramPopulation');
+            const sizeInput = document.getElementById('paramSize');
+            const speedInput = document.getElementById('paramSpeed');
+            const cohInput = document.getElementById('paramCohesion');
+            const aliInput = document.getElementById('paramAlignment');
+            const sepInput = document.getElementById('paramSeparation');
+            const zoomInput = document.getElementById('paramZoom');
+            const themeSelect = document.getElementById('paramTheme');
+            const btnPredator = document.getElementById('btnPredator');
+            const btnAttractor = document.getElementById('btnAttractor');
+            const btnReset = document.getElementById('btnReset');
+
+            zoomInput.addEventListener('input', (e) => {
+                params.zoom = parseFloat(e.target.value);
+                document.getElementById('zoomVal').innerText = `${params.zoom.toFixed(2)}x`;
+            });
+
+            // Wheel zoom directly over canvas
+            canvas.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                let z = params.zoom - e.deltaY * 0.0015;
+                z = Math.max(0.2, Math.min(3.0, z));
+                params.zoom = z;
+                zoomInput.value = z;
+                document.getElementById('zoomVal').innerText = `${params.zoom.toFixed(2)}x`;
+            }, { passive: false });
+
+            popInput.addEventListener('input', (e) => {
+                params.population = parseInt(e.target.value);
+                document.getElementById('popVal').innerText = params.population;
+                initFlock(params.population);
+            });
+
+            sizeInput.addEventListener('input', (e) => {
+                params.birdScale = parseFloat(e.target.value);
+                document.getElementById('sizeVal').innerText = `${params.birdScale.toFixed(1)}x`;
+            });
+
+            speedInput.addEventListener('input', (e) => {
+                params.maxSpeed = parseFloat(e.target.value);
+                document.getElementById('speedVal').innerText = params.maxSpeed.toFixed(1);
+            });
+
+            cohInput.addEventListener('input', (e) => {
+                params.cohesion = parseFloat(e.target.value);
+                document.getElementById('cohVal').innerText = params.cohesion.toFixed(1);
+            });
+
+            aliInput.addEventListener('input', (e) => {
+                params.alignment = parseFloat(e.target.value);
+                document.getElementById('aliVal').innerText = params.alignment.toFixed(1);
+            });
+
+            sepInput.addEventListener('input', (e) => {
+                params.separation = parseFloat(e.target.value);
+                document.getElementById('sepVal').innerText = params.separation.toFixed(1);
+            });
+
+            themeSelect.addEventListener('change', (e) => {
+                params.theme = e.target.value;
+            });
+
+            btnPredator.addEventListener('click', () => {
+                params.mouseMode = 'predator';
+                btnPredator.className = 'py-1.5 px-2 rounded border bg-rose-950/80 border-rose-600 text-rose-300 text-xs font-semibold hover:bg-rose-900 transition';
+                btnAttractor.className = 'py-1.5 px-2 rounded border bg-slate-800 border-slate-700 text-slate-300 text-xs font-semibold hover:bg-slate-700 transition';
+            });
+
+            btnAttractor.addEventListener('click', () => {
+                params.mouseMode = 'attractor';
+                btnAttractor.className = 'py-1.5 px-2 rounded border bg-sky-950/80 border-sky-600 text-sky-300 text-xs font-semibold hover:bg-sky-900 transition';
+                btnPredator.className = 'py-1.5 px-2 rounded border bg-slate-800 border-slate-700 text-slate-300 text-xs font-semibold hover:bg-slate-700 transition';
+            });
+
+            btnReset.addEventListener('click', () => {
+                initFlock(params.population);
+            });
+
+            // Canvas Mouse Coordinates handling with Zoom Transform inversion
+            function updateMousePos(e) {
+                const rect = canvas.getBoundingClientRect();
+                const rawX = e.clientX - rect.left;
+                const rawY = e.clientY - rect.top;
+
+                // Unproject mouse coordinates based on camera zoom scale
+                const zoom = params.zoom;
+                mouse.x = (rawX - width / 2) / zoom + width / 2;
+                mouse.y = (rawY - height / 2) / zoom + height / 2;
+            }
+
+            canvas.addEventListener('mousemove', (e) => {
+                mouse.active = true;
+                updateMousePos(e);
+            });
+
+            canvas.addEventListener('mouseleave', () => {
+                mouse.active = false;
+            });
+
+            canvas.addEventListener('mousedown', (e) => {
+                mouse.active = true;
+                updateMousePos(e);
+            });
+
+            // Touch Support
+            canvas.addEventListener('touchstart', (e) => {
+                if (e.touches.length > 0) {
+                    mouse.active = true;
+                    updateMousePos(e.touches[0]);
+                }
+            }, { passive: true });
+
+            canvas.addEventListener('touchmove', (e) => {
+                if (e.touches.length > 0) {
+                    updateMousePos(e.touches[0]);
+                }
+            }, { passive: true });
+
+            canvas.addEventListener('touchend', () => {
+                mouse.active = false;
+            });
+
+            // Start Simulation Engine
+            initFlock(params.population);
+            requestAnimationFrame(animLoop);
+        };
+    </script>
+</body>
+</html>
