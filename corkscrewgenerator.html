@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Corkscrew Rod Modeler</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root{
+    --bg: #0d1420; --bg-deep: #080c14; --panel: #121b2b; --panel-line: #223047;
+    --grid-line: #1a2740; --ink: #dfe7f2; --ink-dim: #7f92ab;
+    --accent: #ff8c42; --accent-dim: #a85a2a; --face-fill: #35507a; --face-fill2: #6f8fc4;
+  }
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --bg: #eef1f6; --bg-deep: #e2e7ee; --panel: #ffffff; --panel-line: #d3dbe6;
+      --grid-line: #dbe2ec; --ink: #16202f; --ink-dim: #64748b; --accent: #d9611f;
+      --accent-dim: #f0a868; --face-fill: #b9c9e3; --face-fill2: #7f9cc9;
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#eef1f6; --bg-deep:#e2e7ee; --panel:#fff; --panel-line:#d3dbe6; --grid-line:#dbe2ec;
+    --ink:#16202f; --ink-dim:#64748b; --accent:#d9611f; --accent-dim:#f0a868; --face-fill:#b9c9e3; --face-fill2:#7f9cc9;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; height:100%; overflow:hidden; background:var(--bg); }
+  body{ font-family:'Space Grotesk', sans-serif; color:var(--ink); }
+  #stage{ position:fixed; inset:0; }
+  canvas{ display:block; touch-action:none; }
+
+  #title{ position:fixed; top:20px; left:22px; font-size:15px; font-weight:600; z-index:5; user-select:none; display:flex; gap:8px; align-items:baseline; }
+  #title span{ color:var(--ink-dim); font-weight:400; font-size:13px; }
+
+  #readout{
+    position:fixed; top:20px; right:22px; z-index:5; font-family:'JetBrains Mono', monospace;
+    font-size:11px; color:var(--ink-dim); text-align:right; line-height:1.6; user-select:none;
+  }
+  #readout b{ color:var(--ink); font-weight:600; }
+
+  #panel{
+    position:fixed; right:22px; bottom:22px; width:300px; background:var(--panel);
+    border:1px solid var(--panel-line); border-radius:3px; padding:18px 18px 16px;
+    z-index:10; max-height:calc(100vh - 120px); overflow-y:auto;
+  }
+  #panel::-webkit-scrollbar{ width:6px; }
+  #panel::-webkit-scrollbar-thumb{ background:var(--panel-line); border-radius:3px; }
+
+  .row{ margin-bottom:14px; }
+  .row-label{ display:flex; justify-content:space-between; align-items:baseline; font-size:12px; color:var(--ink-dim); margin-bottom:6px; }
+  .row-label b{ font-family:'JetBrains Mono', monospace; color:var(--ink); font-weight:500; font-size:12px; }
+  .row-note{ font-size:10.5px; color:var(--ink-dim); margin-top:4px; opacity:0.75; }
+
+  input[type="range"]{ -webkit-appearance:none; width:100%; height:2px; background:var(--panel-line); border-radius:1px; outline:none; margin:0; }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:13px; height:13px; border-radius:50%; background:var(--accent);
+    cursor:pointer; border:2px solid var(--panel); box-shadow:0 0 0 1px var(--accent);
+  }
+  input[type="range"]::-moz-range-thumb{
+    width:11px; height:11px; border-radius:50%; background:var(--accent); cursor:pointer;
+    border:2px solid var(--panel); box-shadow:0 0 0 1px var(--accent);
+  }
+
+  .divider{ height:1px; background:var(--panel-line); margin:16px 0; }
+  .section-label{ font-size:10.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--ink-dim); margin-bottom:12px; }
+
+  .toggles{ display:flex; flex-direction:column; gap:10px; }
+  .toggle-row{ display:flex; align-items:center; justify-content:space-between; }
+  .toggle-row label{ font-size:12.5px; color:var(--ink); cursor:pointer; user-select:none; }
+  .switch{ position:relative; width:34px; height:19px; flex-shrink:0; }
+  .switch input{ opacity:0; width:0; height:0; position:absolute; }
+  .slider-switch{ position:absolute; inset:0; background:var(--panel-line); border-radius:20px; cursor:pointer; transition:background .15s; }
+  .slider-switch::before{ content:""; position:absolute; width:13px; height:13px; left:3px; top:3px; background:var(--ink-dim); border-radius:50%; transition:transform .15s, background .15s; }
+  input:checked + .slider-switch{ background:var(--accent-dim); }
+  input:checked + .slider-switch::before{ transform:translateX(15px); background:var(--accent); }
+
+  #hint{ position:fixed; left:22px; bottom:22px; z-index:5; font-size:11.5px; color:var(--ink-dim); user-select:none; }
+</style>
+</head>
+<body>
+
+<div id="stage"></div>
+<div id="title">Corkscrew Rod <span>rotating about its own center</span></div>
+<div id="readout">
+  length now <b id="rLen">0.00</b> &middot; z <b id="rZ">0.00</b> &middot; turns <b id="rTurns">0.00</b><br>
+  surface area <b id="rArea">0.00</b> / <b id="rAreaTotal">0.00</b><br>
+  end path length <b id="rPath">0.00</b> / <b id="rPathTotal">0.00</b><br>
+  <b id="rVerts">0</b> vertices &middot; <b id="rTris">0</b> triangles
+</div>
+<div id="hint">drag to orbit &middot; scroll to zoom</div>
+
+<div id="panel">
+  <div class="section-label">Rod behavior</div>
+  <div class="row">
+    <div class="row-label"><span>Initial rod length</span><b id="vL0">0.30</b></div>
+    <input type="range" id="L0" min="0" max="2" step="0.02" value="0.3">
+  </div>
+  <div class="row">
+    <div class="row-label"><span>Extension rate</span><b id="vExt">0.35</b></div>
+    <input type="range" id="ext" min="-1" max="1.5" step="0.01" value="0.35">
+    <div class="row-note">total rod length added per unit time, split evenly from center (negative = shrinking)</div>
+  </div>
+  <div class="row">
+    <div class="row-label"><span>Rotation rate</span><b id="vRot">0.40</b></div>
+    <input type="range" id="rot" min="-2" max="2" step="0.01" value="0.4">
+    <div class="row-note">revolutions per unit time about the spine</div>
+  </div>
+  <div class="row">
+    <div class="row-label"><span>Translation rate</span><b id="vTrans">0.35</b></div>
+    <input type="range" id="trans" min="0" max="2" step="0.01" value="0.35">
+    <div class="row-note">spine movement per unit time</div>
+  </div>
+
+  <div class="divider"></div>
+  <div class="section-label">Sweep extent</div>
+  <div class="row">
+    <div class="row-label"><span>Duration</span><b id="vDur">14.0</b></div>
+    <input type="range" id="dur" min="1" max="40" step="0.5" value="14">
+    <div class="row-note">how much time the surface covers</div>
+  </div>
+
+  <div class="divider"></div>
+  <div class="toggles">
+    <div class="toggle-row">
+      <label for="animate">Animate sweep</label>
+      <span class="switch"><input type="checkbox" id="animate" checked><span class="slider-switch"></span></span>
+    </div>
+    <div class="toggle-row">
+      <label for="orbitview">Auto-orbit view</label>
+      <span class="switch"><input type="checkbox" id="orbitview"><span class="slider-switch"></span></span>
+    </div>
+    <div class="toggle-row">
+      <label for="wire">Wireframe</label>
+      <span class="switch"><input type="checkbox" id="wire"><span class="slider-switch"></span></span>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const stage = document.getElementById('stage');
+  const scene = new THREE.Scene();
+
+  function readVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  const camera = new THREE.PerspectiveCamera(42, window.innerWidth/window.innerHeight, 0.05, 200);
+  const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  stage.appendChild(renderer.domElement);
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x1a1a2a, 0.9));
+  const key = new THREE.DirectionalLight(0xffffff, 1.0); key.position.set(4,6,5); scene.add(key);
+  const fill = new THREE.DirectionalLight(0xfff0e0, 0.35); fill.position.set(-5,-2,-4); scene.add(fill);
+
+  let grid = null;
+  function buildGrid(){
+    if (grid) scene.remove(grid);
+    const c = new THREE.Color(readVar('--grid-line') || '#1a2740');
+    grid = new THREE.GridHelper(14, 24, c, c);
+    grid.material.opacity = 0.4; grid.material.transparent = true;
+    grid.position.y = -3.6;
+    scene.add(grid);
+  }
+  buildGrid();
+
+  // ---------- scene objects ----------
+  let ribbon = null, ribbonEdges = null, outerLine = null, axisLine = null, tipMarker = null, liveRod = null;
+  let rowCount = 0;      // number of time-samples (rows) in current geometry
+  let fullTriVerts = 0;  // total vertex count in ribbon buffer
+  let currentParams = null;
+  let cumLenA = null, cumLenB = null, cumArea = null; // cumulative measures, indexed by row 0..N
+
+  function computeRows(dur, rot){
+    const samplesPerRev = 40;
+    const n = Math.ceil(dur * Math.max(Math.abs(rot), 0.06) * samplesPerRev);
+    return Math.min(3000, Math.max(80, n));
+  }
+
+  function centerAt(t, p){
+    return new THREE.Vector3(0, 0, p.trans * t);
+  }
+
+  function tipAt(t, sign, p){
+    // sign = +1 or -1: the rod's two ends, equidistant from its own center
+    const theta = 2 * Math.PI * p.rot * t;
+    const halfLen = Math.max(0, p.L0 + p.ext * t) / 2;
+    const c = centerAt(t, p);
+    return new THREE.Vector3(
+      c.x + sign * halfLen * Math.cos(theta),
+      c.y + sign * halfLen * Math.sin(theta),
+      c.z
+    );
+  }
+
+  function rebuild(){
+    const p = {
+      L0: parseFloat(L0El.value),
+      ext: parseFloat(extEl.value),
+      rot: parseFloat(rotEl.value),
+      trans: parseFloat(transEl.value),
+      dur: parseFloat(durEl.value)
+    };
+    currentParams = p;
+    const N = computeRows(p.dur, p.rot);
+    rowCount = N;
+
+    const center = new Float32Array((N+1)*3);
+    const tipA = new Float32Array((N+1)*3);   // sign +1
+    const tipB = new Float32Array((N+1)*3);   // sign -1
+    for (let i = 0; i <= N; i++){
+      const t = p.dur * i / N;
+      const c = centerAt(t, p);
+      const a = tipAt(t, 1, p);
+      const b = tipAt(t, -1, p);
+      center[i*3]=c.x; center[i*3+1]=c.y; center[i*3+2]=c.z;
+      tipA[i*3]=a.x; tipA[i*3+1]=a.y; tipA[i*3+2]=a.z;
+      tipB[i*3]=b.x; tipB[i*3+1]=b.y; tipB[i*3+2]=b.z;
+    }
+
+    // ribbon triangles (non-indexed): for each row transition, 2 wings x 2 triangles = 12 verts
+    const positions = new Float32Array(N * 12 * 3);
+    for (let i = 0; i < N; i++){
+      const cx0=center[i*3],cy0=center[i*3+1],cz0=center[i*3+2];
+      const cx1=center[(i+1)*3],cy1=center[(i+1)*3+1],cz1=center[(i+1)*3+2];
+      const ax0=tipA[i*3],ay0=tipA[i*3+1],az0=tipA[i*3+2];
+      const ax1=tipA[(i+1)*3],ay1=tipA[(i+1)*3+1],az1=tipA[(i+1)*3+2];
+      const bx0=tipB[i*3],by0=tipB[i*3+1],bz0=tipB[i*3+2];
+      const bx1=tipB[(i+1)*3],by1=tipB[(i+1)*3+1],bz1=tipB[(i+1)*3+2];
+      const o = i*36;
+      positions.set([
+        // wing A: center -> tipA
+        cx0,cy0,cz0,  cx1,cy1,cz1,  ax1,ay1,az1,
+        cx0,cy0,cz0,  ax1,ay1,az1,  ax0,ay0,az0,
+        // wing B: center -> tipB
+        cx0,cy0,cz0,  bx1,by1,bz1,  cx1,cy1,cz1,
+        cx0,cy0,cz0,  bx0,by0,bz0,  bx1,by1,bz1
+      ], o);
+    }
+    fullTriVerts = positions.length/3;
+
+    // ---- cumulative arc length of each end (for path-length readout) ----
+    cumLenA = new Float64Array(N+1); cumLenA[0] = 0;
+    cumLenB = new Float64Array(N+1); cumLenB[0] = 0;
+    for (let i = 1; i <= N; i++){
+      const dxA = tipA[i*3]-tipA[(i-1)*3], dyA = tipA[i*3+1]-tipA[(i-1)*3+1], dzA = tipA[i*3+2]-tipA[(i-1)*3+2];
+      const dxB = tipB[i*3]-tipB[(i-1)*3], dyB = tipB[i*3+1]-tipB[(i-1)*3+1], dzB = tipB[i*3+2]-tipB[(i-1)*3+2];
+      cumLenA[i] = cumLenA[i-1] + Math.sqrt(dxA*dxA+dyA*dyA+dzA*dzA);
+      cumLenB[i] = cumLenB[i-1] + Math.sqrt(dxB*dxB+dyB*dyB+dzB*dzB);
+    }
+
+    // ---- cumulative surface area, summing the exact triangles that get drawn ----
+    function triArea(ax,ay,az,bx,by,bz,cx,cy,cz){
+      const ux=bx-ax, uy=by-ay, uz=bz-az;
+      const vx=cx-ax, vy=cy-ay, vz=cz-az;
+      const nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
+      return 0.5*Math.sqrt(nx*nx+ny*ny+nz*nz);
+    }
+    cumArea = new Float64Array(N+1); cumArea[0] = 0;
+    for (let i = 0; i < N; i++){
+      const o = i*36;
+      let rowArea = 0;
+      for (let k = 0; k < 4; k++){
+        const b = o + k*9;
+        rowArea += triArea(
+          positions[b],positions[b+1],positions[b+2],
+          positions[b+3],positions[b+4],positions[b+5],
+          positions[b+6],positions[b+7],positions[b+8]
+        );
+      }
+      cumArea[i+1] = cumArea[i] + rowArea;
+    }
+
+    if (ribbon){ scene.remove(ribbon); ribbon.geometry.dispose(); ribbon.material.dispose(); }
+    if (ribbonEdges){ scene.remove(ribbonEdges); ribbonEdges.geometry.dispose(); ribbonEdges.material.dispose(); }
+    if (outerLine){
+      scene.remove(outerLine);
+      outerLine.userData.lineA.geometry.dispose(); outerLine.userData.lineA.material.dispose();
+      outerLine.userData.lineB.geometry.dispose(); outerLine.userData.lineB.material.dispose();
+    }
+    if (axisLine){ scene.remove(axisLine); axisLine.geometry.dispose(); axisLine.material.dispose(); }
+    if (tipMarker){
+      scene.remove(tipMarker);
+      tipMarker.userData.markerA.geometry.dispose(); tipMarker.userData.markerA.material.dispose();
+      tipMarker.userData.markerB.geometry.dispose(); tipMarker.userData.markerB.material.dispose();
+    }
+    if (liveRod){ scene.remove(liveRod); liveRod.geometry.dispose(); liveRod.material.dispose(); }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.computeVertexNormals();
+
+    const fillColor = new THREE.Color(readVar('--face-fill') || '#35507a');
+    const mat = new THREE.MeshStandardMaterial({
+      color: fillColor, metalness: 0.12, roughness: 0.6,
+      side: THREE.DoubleSide, transparent:true, opacity: 0.92
+    });
+    ribbon = new THREE.Mesh(geo, mat);
+    scene.add(ribbon);
+
+    const wireColor = new THREE.Color(readVar('--panel-line') || '#223047');
+    const edgeMat = new THREE.LineBasicMaterial({ color: wireColor, transparent:true, opacity: 0.5 });
+    const edgeGeo = new THREE.WireframeGeometry(geo);
+    ribbonEdges = new THREE.LineSegments(edgeGeo, edgeMat);
+    scene.add(ribbonEdges);
+
+    const accent = new THREE.Color(readVar('--accent') || '#ff8c42');
+    const outerGeoA = new THREE.BufferGeometry();
+    outerGeoA.setAttribute('position', new THREE.BufferAttribute(tipA, 3));
+    const outerGeoB = new THREE.BufferGeometry();
+    outerGeoB.setAttribute('position', new THREE.BufferAttribute(tipB, 3));
+    outerLine = new THREE.Group();
+    const lineA = new THREE.Line(outerGeoA, new THREE.LineBasicMaterial({ color: accent, linewidth: 2 }));
+    const lineB = new THREE.Line(outerGeoB, new THREE.LineBasicMaterial({ color: accent, linewidth: 2 }));
+    outerLine.add(lineA); outerLine.add(lineB);
+    outerLine.userData = { lineA, lineB };
+    scene.add(outerLine);
+
+    const axisColor = new THREE.Color(readVar('--ink-dim') || '#7f92ab');
+    const axisGeo = new THREE.BufferGeometry();
+    axisGeo.setAttribute('position', new THREE.BufferAttribute(center, 3));
+    axisLine = new THREE.Line(axisGeo, new THREE.LineBasicMaterial({ color: axisColor, transparent:true, opacity:0.55 }));
+    scene.add(axisLine);
+
+    const tipGeo = new THREE.SphereGeometry(0.045, 16, 16);
+    const tipMat = new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.4 });
+    const markerA = new THREE.Mesh(tipGeo, tipMat);
+    const markerB = new THREE.Mesh(tipGeo, tipMat.clone());
+    tipMarker = new THREE.Group();
+    tipMarker.add(markerA); tipMarker.add(markerB);
+    tipMarker.userData = { markerA, markerB };
+    scene.add(tipMarker);
+
+    const liveGeo = new THREE.BufferGeometry();
+    liveGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+    liveRod = new THREE.Line(liveGeo, new THREE.LineBasicMaterial({ color: accent, linewidth: 3 }));
+    scene.add(liveRod);
+
+    applyWireToggle();
+    updateReadoutStatic(p, N);
+  }
+
+  function updateReadoutStatic(p, N){
+    document.getElementById('rVerts').textContent = fullTriVerts.toLocaleString();
+    document.getElementById('rTris').textContent = (fullTriVerts/3).toLocaleString();
+    document.getElementById('rAreaTotal').textContent = cumArea[N].toFixed(2);
+    document.getElementById('rPathTotal').textContent = ((cumLenA[N]+cumLenB[N])/2).toFixed(2);
+  }
+
+  function setReveal(tReveal){
+    const p = currentParams;
+    if (!p) return;
+    const N = rowCount;
+    const frac = Math.max(0, Math.min(1, tReveal / p.dur));
+    const revealedRows = Math.max(1, Math.round(frac * N));
+
+    ribbon.geometry.setDrawRange(0, revealedRows * 12);
+    ribbonEdges.visible = wireEl.checked;
+
+    outerLine.userData.lineA.geometry.setDrawRange(0, revealedRows + 1);
+    outerLine.userData.lineB.geometry.setDrawRange(0, revealedRows + 1);
+    axisLine.geometry.setDrawRange(0, revealedRows + 1);
+
+    const t = frac * p.dur;
+    const tipA_ = tipAt(t, 1, p);
+    const tipB_ = tipAt(t, -1, p);
+    tipMarker.userData.markerA.position.copy(tipA_);
+    tipMarker.userData.markerB.position.copy(tipB_);
+
+    const arr = liveRod.geometry.attributes.position.array;
+    arr[0]=tipA_.x; arr[1]=tipA_.y; arr[2]=tipA_.z;
+    arr[3]=tipB_.x; arr[4]=tipB_.y; arr[5]=tipB_.z;
+    liveRod.geometry.attributes.position.needsUpdate = true;
+
+    document.getElementById('rLen').textContent = Math.max(0, p.L0 + p.ext*t).toFixed(2);
+    document.getElementById('rZ').textContent = (p.trans*t).toFixed(2);
+    document.getElementById('rTurns').textContent = (p.rot*t).toFixed(2);
+    document.getElementById('rArea').textContent = cumArea[revealedRows].toFixed(2);
+    document.getElementById('rPath').textContent = ((cumLenA[revealedRows]+cumLenB[revealedRows])/2).toFixed(2);
+  }
+
+  function applyWireToggle(){
+    ribbon.visible = !wireEl.checked;
+    ribbonEdges.visible = true;
+    ribbonEdges.material.opacity = wireEl.checked ? 0.9 : 0.35;
+  }
+
+  // ---------- manual orbit controls ----------
+  let camTheta = 0.85, camPhi = 1.15, camRadius = 9;
+  let dragging = false, lastX = 0, lastY = 0;
+  function updateCamera(){
+    const x = camRadius * Math.sin(camPhi) * Math.cos(camTheta);
+    const y = camRadius * Math.cos(camPhi) - 1.2;
+    const z = camRadius * Math.sin(camPhi) * Math.sin(camTheta);
+    camera.position.set(x, y, z);
+    camera.lookAt(0, 1.2, 0);
+  }
+  updateCamera();
+  renderer.domElement.addEventListener('pointerdown', e => { dragging = true; lastX = e.clientX; lastY = e.clientY; });
+  window.addEventListener('pointerup', () => dragging = false);
+  window.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    camTheta -= dx * 0.006;
+    camPhi -= dy * 0.006;
+    camPhi = Math.max(0.1, Math.min(Math.PI - 0.1, camPhi));
+    updateCamera();
+  });
+  renderer.domElement.addEventListener('wheel', e => {
+    e.preventDefault();
+    camRadius *= (1 + e.deltaY * 0.001);
+    camRadius = Math.max(1.5, Math.min(60, camRadius));
+    updateCamera();
+  }, { passive:false });
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // ---------- UI wiring ----------
+  const L0El = document.getElementById('L0');
+  const extEl = document.getElementById('ext');
+  const rotEl = document.getElementById('rot');
+  const transEl = document.getElementById('trans');
+  const durEl = document.getElementById('dur');
+  const wireEl = document.getElementById('wire');
+  const animateEl = document.getElementById('animate');
+  const orbitEl = document.getElementById('orbitview');
+
+  const vL0 = document.getElementById('vL0');
+  const vExt = document.getElementById('vExt');
+  const vRot = document.getElementById('vRot');
+  const vTrans = document.getElementById('vTrans');
+  const vDur = document.getElementById('vDur');
+
+  function syncLabels(){
+    vL0.textContent = parseFloat(L0El.value).toFixed(2);
+    vExt.textContent = parseFloat(extEl.value).toFixed(2);
+    vRot.textContent = parseFloat(rotEl.value).toFixed(2);
+    vTrans.textContent = parseFloat(transEl.value).toFixed(2);
+    vDur.textContent = parseFloat(durEl.value).toFixed(1);
+  }
+
+  [L0El, extEl, rotEl, transEl, durEl].forEach(el => {
+    el.addEventListener('input', () => { syncLabels(); rebuild(); if(!animateEl.checked) setReveal(currentParams.dur); else revealT = 0; });
+  });
+  wireEl.addEventListener('change', applyWireToggle);
+
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { buildGrid(); rebuild(); });
+
+  // ---------- animation loop ----------
+  let revealT = 0;
+  let lastTime = performance.now();
+  function animate(now){
+    requestAnimationFrame(animate);
+    const dt = Math.min(0.05, (now - lastTime) / 1000);
+    lastTime = now;
+
+    if (orbitEl.checked){ camTheta += dt * 0.18; updateCamera(); }
+
+    if (currentParams){
+      if (animateEl.checked){
+        const speed = currentParams.dur / 6.5; // full sweep in ~6.5s
+        revealT += dt * speed;
+        if (revealT > currentParams.dur) revealT = 0;
+        setReveal(revealT);
+      } else {
+        setReveal(currentParams.dur);
+      }
+    }
+    renderer.render(scene, camera);
+  }
+
+  syncLabels();
+  rebuild();
+  requestAnimationFrame(animate);
+})();
+</script>
+
+</body>
+</html>
