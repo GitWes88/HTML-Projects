@@ -1,0 +1,812 @@
+<title>Double Pendulum</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one full-height instrument. The stage holds the swinging arms and the tracer, the right column holds the controls.
+   On phones the stage sits on top and the controls scroll beneath it. */
+:root{
+  --font-display:'Bricolage Grotesque','Inter',system-ui,sans-serif;
+  --font-body:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+
+  /* Cool grey paper, blue-black ink, cobalt for the main pendulum, burnt orange for the twin. */
+  --bg:#e8ecf0;
+  --stage:#fbfcfd;
+  --control:#ffffff;
+  --line:#d3dae1;
+  --ink:#14202b;
+  --muted:#5b6b7a;
+  --accent:#2457d6;
+  --accent-ink:#ffffff;
+  --twin:#c2531f;
+  --grid:rgba(30,60,90,.07);
+
+  /* Lightness and saturation the canvas uses for tracer colors. */
+  --trail-s:78;
+  --trail-l:44;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#090d12;
+    --stage:#0b1016;
+    --control:#111922;
+    --line:#1e2a36;
+    --ink:#dbe4ec;
+    --muted:#8798a9;
+    --accent:#6f9cff;
+    --accent-ink:#08101c;
+    --twin:#ff9a62;
+    --grid:rgba(120,155,190,.07);
+    --trail-s:92;
+    --trail-l:63;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#090d12;
+  --stage:#0b1016;
+  --control:#111922;
+  --line:#1e2a36;
+  --ink:#dbe4ec;
+  --muted:#8798a9;
+  --accent:#6f9cff;
+  --accent-ink:#08101c;
+  --twin:#ff9a62;
+  --grid:rgba(120,155,190,.07);
+  --trail-s:92;
+  --trail-l:63;
+  color-scheme:dark;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--font-body);
+  font-size:14px;
+  line-height:1.45;
+  padding-block:16px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  -webkit-font-smoothing:antialiased;
+}
+
+.app{
+  height:100%;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 336px;
+  grid-template-rows:minmax(0,1fr);
+  gap:20px;
+}
+
+/* ---------- stage ---------- */
+.stage{
+  position:relative;
+  min-height:0;min-width:0;
+  border:1px solid var(--line);
+  border-radius:6px;
+  overflow:hidden;
+  background-color:var(--stage);
+  background-image:
+    linear-gradient(var(--grid) 1px,transparent 1px),
+    linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:40px 40px;
+  background-position:center;
+}
+#view{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.readout{
+  position:absolute;left:12px;top:10px;right:12px;
+  display:flex;flex-wrap:wrap;gap:2px 16px;
+  font:500 11.5px/1.5 var(--font-mono);
+  color:var(--muted);
+  pointer-events:none;
+  font-variant-numeric:tabular-nums;
+}
+.readout b{display:inline-block;min-width:6.5ch;text-align:right;font-weight:500;color:var(--ink)}
+.hint{
+  position:absolute;right:12px;bottom:10px;
+  font:400 11px/1.4 var(--font-mono);color:var(--muted);
+  pointer-events:none;text-align:right;max-width:46%;
+}
+.notice{
+  position:absolute;left:50%;top:52px;transform:translateX(-50%);
+  width:max-content;max-width:min(440px,calc(100% - 32px));
+  padding:9px 13px;border:1px solid var(--line);border-radius:6px;
+  background:var(--control);color:var(--ink);font-size:13px;
+}
+
+/* ---------- control column ---------- */
+.panel{
+  min-height:0;min-width:0;
+  overflow-y:auto;overflow-x:hidden;
+  display:flex;flex-direction:column;gap:24px;
+  padding:2px 6px 8px 2px;
+  scrollbar-width:thin;
+  scrollbar-color:var(--line) transparent;
+}
+.sec{display:flex;flex-direction:column;gap:12px;min-width:0}
+.sec-h{
+  margin:0;display:flex;align-items:center;gap:10px;
+  font:500 11px/1 var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);
+}
+.sec-h::after{content:"";flex:1;height:1px;background:var(--line)}
+h1{margin:0;font:700 26px/1.05 var(--font-display);letter-spacing:-.015em;text-wrap:balance}
+.note{margin:0;color:var(--muted);font-size:12.5px;line-height:1.5}
+.stack{display:flex;flex-direction:column;gap:14px}
+
+select{
+  width:150px;font:500 13px var(--font-body);color:var(--ink);
+  padding:6px 8px;border:1px solid var(--line);border-radius:5px;background:var(--control);cursor:pointer;
+}
+details.eqs{border:1px solid var(--line);border-radius:5px;background:var(--control)}
+details.eqs summary{
+  cursor:pointer;padding:8px 12px;font:500 12.5px var(--font-body);list-style:none;
+  display:flex;align-items:center;justify-content:space-between;
+}
+details.eqs summary::-webkit-details-marker{display:none}
+details.eqs summary::after{content:"+";font:500 14px var(--font-mono);color:var(--muted)}
+details.eqs[open] summary::after{content:"−"}
+details.eqs pre{
+  margin:0;padding:2px 12px 12px;overflow-x:auto;white-space:pre;
+  font:400 12px/1.7 var(--font-mono);color:var(--ink);
+}
+
+.btn{
+  font:500 13px var(--font-body);padding:7px 12px;border-radius:5px;
+  border:1px solid var(--line);background:var(--control);color:var(--ink);cursor:pointer;
+}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.08)}
+.actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{
+  font:500 11.5px var(--font-mono);padding:4px 9px;border-radius:4px;cursor:pointer;
+  border:1px solid var(--line);background:var(--control);color:var(--ink);
+}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+
+/* slider rows */
+.ctl{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:2px 10px}
+.ctl .lab{font-size:13px;min-width:0}
+.ctl .sym{font:500 13px var(--font-mono);color:var(--accent);margin-right:6px}
+.ctl .nm{color:var(--ink)}
+.num{
+  width:78px;padding:3px 6px;text-align:right;
+  font:500 12px var(--font-mono);color:var(--ink);font-variant-numeric:tabular-nums;
+  background:var(--control);border:1px solid var(--line);border-radius:4px;
+  -moz-appearance:textfield;appearance:textfield;
+}
+.num::-webkit-outer-spin-button,.num::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.ctl input[type=range]{grid-column:1 / -1}
+input[type=range]{
+  -webkit-appearance:none;appearance:none;width:100%;height:20px;margin:0;background:transparent;cursor:pointer;
+}
+input[type=range]::-webkit-slider-runnable-track{
+  height:2px;border-radius:1px;
+  background:linear-gradient(to right,var(--accent) var(--p,0%),var(--line) var(--p,0%));
+}
+input[type=range]::-moz-range-track{height:2px;background:var(--line);border-radius:1px}
+input[type=range]::-moz-range-progress{height:2px;background:var(--accent);border-radius:1px}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:14px;height:14px;margin-top:-6px;border-radius:50%;
+  background:var(--accent);border:2px solid var(--stage);box-shadow:0 0 0 1px var(--accent);
+}
+input[type=range]::-moz-range-thumb{
+  width:10px;height:10px;border-radius:50%;background:var(--accent);border:2px solid var(--stage);box-shadow:0 0 0 1px var(--accent);
+}
+
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px}
+.row > label{flex:1;min-width:0}
+.sw{
+  -webkit-appearance:none;appearance:none;position:relative;flex:none;
+  width:34px;height:20px;margin:0;border-radius:10px;background:var(--line);cursor:pointer;transition:background .15s;
+}
+.sw::after{
+  content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;
+  background:var(--muted);transition:transform .15s,background .15s;
+}
+.sw:checked{background:var(--accent)}
+.sw:checked::after{transform:translateX(14px);background:var(--accent-ink)}
+
+input:focus-visible,button:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+#spark{width:100%;height:104px;display:block;border:1px solid var(--line);border-radius:5px;background:var(--control)}
+
+@media (max-width:880px){
+  html,body{height:auto}
+  .app{height:auto;grid-template-columns:minmax(0,1fr);grid-template-rows:auto}
+  .stage{height:min(calc(100vw - 32px),62vh);min-height:320px}
+  .panel{overflow:visible;padding:0}
+}
+@media (prefers-reduced-motion: reduce){
+  .sw,.sw::after{transition:none}
+}
+</style>
+
+<div class="app">
+  <section class="stage" id="stage" aria-label="Double pendulum and tracer">
+    <canvas id="view" role="img" aria-label="Double pendulum with a tracer drawn by the outer bob. Drag either bob to set the starting pose."></canvas>
+    <div class="readout" id="readout" aria-hidden="true">
+      <span>t <b id="r-t">0.00</b></span>
+      <span>θ₁ <b id="r-a">0.0</b>°</span>
+      <span>θ₂ <b id="r-b">0.0</b>°</span>
+      <span>ω₁ <b id="r-c">0.00</b></span>
+      <span>ω₂ <b id="r-d">0.00</b></span>
+      <span>ΔE <b id="r-e">0.0000</b>%</span>
+      <span id="r-gw">gap <b id="r-g">0.000</b></span>
+    </div>
+    <div class="notice" id="notice" role="status" hidden></div>
+    <div class="hint" id="hint">Drag a bob to set the starting pose</div>
+  </section>
+
+  <aside class="panel" aria-label="Controls">
+    <header class="sec">
+      <h1>Double Pendulum</h1>
+      <p class="note">A pendulum hung from the end of a pendulum. The outer bob leaves a tracer. A twin starts a hair away on the right, so you can watch the two paths part ways.</p>
+    </header>
+
+    <div class="actions">
+      <button class="btn primary" id="btn-pause" type="button" aria-pressed="false">Pause</button>
+      <button class="btn" id="btn-restart" type="button" title="Return to the starting pose (R)">Restart</button>
+      <button class="btn" id="btn-clear" type="button" title="Erase the tracer (C)">Clear trail</button>
+    </div>
+
+    <section class="sec">
+      <h2 class="sec-h">Starting pose</h2>
+      <div class="chips" id="presets"></div>
+      <div class="stack" id="pose"></div>
+      <p class="note">Angles are measured from straight down. Changing any of these restarts the run.</p>
+    </section>
+
+    <section class="sec">
+      <h2 class="sec-h">Pendulum</h2>
+      <div class="stack" id="phys"></div>
+      <details class="eqs">
+        <summary>Equations of motion</summary>
+        <pre>δ = θ₁ − θ₂
+D = 2m₁ + m₂ − m₂ cos 2δ
+
+θ₁″ = [ −g(2m₁ + m₂) sin θ₁
+        − m₂g sin(θ₁ − 2θ₂)
+        − 2 sin δ · m₂(ω₂²L₂ + ω₁²L₁ cos δ) ] / (L₁D)
+
+θ₂″ = [ 2 sin δ (ω₁²L₁(m₁ + m₂)
+        + g(m₁ + m₂) cos θ₁
+        + ω₂²L₂m₂ cos δ) ] / (L₂D)
+
+Damping subtracts c·ω from each θ″.</pre>
+      </details>
+    </section>
+
+    <section class="sec">
+      <h2 class="sec-h">Tracer</h2>
+      <div class="stack" id="tracer"></div>
+    </section>
+
+    <section class="sec">
+      <h2 class="sec-h">Time</h2>
+      <div class="stack" id="time"></div>
+    </section>
+
+    <section class="sec">
+      <h2 class="sec-h">Twin separation</h2>
+      <canvas id="spark" aria-label="Distance between the two tracer tips over time, log scale"></canvas>
+      <p class="note" id="sparknote"></p>
+    </section>
+  </aside>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ------------------------------------------------------------------ helpers */
+const $ = id => document.getElementById(id);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const fmtG = v => String(+v.toPrecision(3));
+const D2R = Math.PI / 180, R2D = 180 / Math.PI;
+const wrapDeg = a => { a = ((a + 180) % 360 + 360) % 360 - 180; return a === -180 ? 180 : a; };
+
+/* -------------------------------------------------------------------- state
+   Physical parameters P apply live. Starting pose I (degrees, rad/s) applies on restart. */
+const P = { m1: 1, m2: 1, l1: 1, l2: 1, g: 9.81, c: 0 };
+const I = { th1: 120, th2: -10, w1: 0, w2: 0 };
+const S = { dt: 0.004, speed: 1, trailLen: 8000, lw: 1.6, mode: 'speed', twin: true, eps: 1e-3, reach: true, paused: false };
+
+const sA = new Float64Array(4), sB = new Float64Array(4);   // [θ1, θ2, ω1, ω2]
+let t = 0, acc = 0, stepN = 0, vmax = 1, E0 = 0;
+
+/* ------------------------------------------------------------------ physics */
+const k1 = new Float64Array(4), k2 = new Float64Array(4), k3 = new Float64Array(4), k4 = new Float64Array(4), tmp = new Float64Array(4);
+
+function deriv(s, o) {
+  const t1 = s[0], t2 = s[1], w1 = s[2], w2 = s[3];
+  const m1 = P.m1, m2 = P.m2, l1 = P.l1, l2 = P.l2, g = P.g, c = P.c;
+  const d = t1 - t2, cd = Math.cos(d), sd = Math.sin(d);
+  const den = 2 * m1 + m2 - m2 * Math.cos(2 * d);
+  o[0] = w1; o[1] = w2;
+  o[2] = (-g * (2 * m1 + m2) * Math.sin(t1) - m2 * g * Math.sin(t1 - 2 * t2) - 2 * sd * m2 * (w2 * w2 * l2 + w1 * w1 * l1 * cd)) / (l1 * den) - c * w1;
+  o[3] = (2 * sd * (w1 * w1 * l1 * (m1 + m2) + g * (m1 + m2) * Math.cos(t1) + w2 * w2 * l2 * m2 * cd)) / (l2 * den) - c * w2;
+}
+function rk4(s, dt) {
+  const h = dt * 0.5;
+  deriv(s, k1);
+  for (let i = 0; i < 4; i++) tmp[i] = s[i] + h * k1[i];
+  deriv(tmp, k2);
+  for (let i = 0; i < 4; i++) tmp[i] = s[i] + h * k2[i];
+  deriv(tmp, k3);
+  for (let i = 0; i < 4; i++) tmp[i] = s[i] + dt * k3[i];
+  deriv(tmp, k4);
+  const d = dt / 6;
+  for (let i = 0; i < 4; i++) s[i] += d * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]);
+}
+function energy(s) {
+  const w1 = s[2], w2 = s[3];
+  const T = 0.5 * P.m1 * P.l1 * P.l1 * w1 * w1
+          + 0.5 * P.m2 * (P.l1 * P.l1 * w1 * w1 + P.l2 * P.l2 * w2 * w2 + 2 * P.l1 * P.l2 * w1 * w2 * Math.cos(s[0] - s[1]));
+  const V = -(P.m1 + P.m2) * P.g * P.l1 * Math.cos(s[0]) - P.m2 * P.g * P.l2 * Math.cos(s[1]);
+  return T + V;
+}
+const tipX = s => P.l1 * Math.sin(s[0]) + P.l2 * Math.sin(s[1]);
+const tipY = s => -P.l1 * Math.cos(s[0]) - P.l2 * Math.cos(s[1]);
+
+/* ------------------------------------------------------------------- tracer */
+const CAP = 30000;
+const makeTrail = () => ({ x: new Float32Array(CAP), y: new Float32Array(CAP), v: new Float32Array(CAP), head: 0, count: 0 });
+const trA = makeTrail(), trB = makeTrail();
+const sx = new Float32Array(CAP), sy = new Float32Array(CAP);
+
+function pushTip(tr, s) {
+  const vx = P.l1 * Math.cos(s[0]) * s[2] + P.l2 * Math.cos(s[1]) * s[3];
+  const vy = P.l1 * Math.sin(s[0]) * s[2] + P.l2 * Math.sin(s[1]) * s[3];
+  const v = Math.hypot(vx, vy);
+  const h = tr.head;
+  tr.x[h] = tipX(s); tr.y[h] = tipY(s); tr.v[h] = v;
+  tr.head = h + 1 === CAP ? 0 : h + 1;
+  if (tr.count < CAP) tr.count++;
+  if (v > vmax) vmax = v;
+}
+function clearTrails() {
+  trA.head = trA.count = 0; trB.head = trB.count = 0;
+  pushTip(trA, sA); if (S.twin) pushTip(trB, sB);
+}
+
+/* ---------------------------------------------------------- twin separation */
+let sepT = [], sepV = [], sepEvery = 20;
+function pushSep() {
+  const d = Math.hypot(tipX(sA) - tipX(sB), tipY(sA) - tipY(sB));
+  sepT.push(t); sepV.push(Math.log10(Math.max(d, 1e-12)));
+  if (sepT.length > 900) {
+    sepT = sepT.filter((_, i) => i % 2 === 0); sepV = sepV.filter((_, i) => i % 2 === 0); sepEvery *= 2;
+  }
+}
+function resetTwin() {
+  sB.set(sA); sB[0] += S.eps;
+  trB.head = trB.count = 0; if (S.twin) pushTip(trB, sB);
+  sepT = []; sepV = []; sepEvery = 20; stepN = 0;
+  updateSparkNote();
+}
+
+function stepOnce() {
+  rk4(sA, S.dt); pushTip(trA, sA);
+  if (S.twin) { rk4(sB, S.dt); pushTip(trB, sB); }
+  t += S.dt; vmax *= 0.99995;
+  if (S.twin && ++stepN % sepEvery === 0) pushSep();
+}
+
+function reset() {
+  sA[0] = I.th1 * D2R; sA[1] = I.th2 * D2R; sA[2] = I.w1; sA[3] = I.w2;
+  t = 0; acc = 0; vmax = 1;
+  hideNotice();
+  resetTwin();
+  trA.head = trA.count = 0;
+  pushTip(trA, sA);
+  E0 = energy(sA);
+}
+
+/* ------------------------------------------------------------------- canvas */
+const stage = $('stage'), cv = $('view'), ctx = cv.getContext('2d');
+const spark = $('spark'), sctx = spark.getContext('2d');
+let W = 300, H = 300, SW = 300, SH = 104, dpr = 1, ox = 150, oy = 150, sc = 100, topPad = 40;
+let theme = {};
+const bob = { x1: 0, y1: 0, x2: 0, y2: 0 };
+
+function readTheme() {
+  const cs = getComputedStyle(document.documentElement);
+  const g = n => cs.getPropertyValue(n).trim();
+  theme = {
+    s: +g('--trail-s') || 80, l: +g('--trail-l') || 45,
+    ink: g('--ink'), muted: g('--muted'), accent: g('--accent'), twin: g('--twin'),
+    line: g('--line'), stage: g('--stage'), mono: g('--font-mono') || 'monospace'
+  };
+}
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = Math.max(1, stage.clientWidth); H = Math.max(1, stage.clientHeight);
+  topPad = $('readout').offsetHeight + 12;
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  SW = Math.max(1, spark.clientWidth); SH = Math.max(1, spark.clientHeight);
+  spark.width = Math.round(SW * dpr); spark.height = Math.round(SH * dpr);
+}
+
+/* Tracer drawing. Segments are grouped by color and age tier so each frame costs a few dozen strokes, not thousands. */
+const NB = 24, TIERS = 4, CH = 32;
+const tierAlpha = [0.28, 0.5, 0.75, 0.95];
+const hueOf = (twin, u) => twin ? 14 + 44 * u : 200 + 145 * u;
+const hsl = (h, s, l) => `hsl(${Math.round(h)}, ${s}%, ${l}%)`;
+
+function drawTrail(tr, twin, ox, oy, sc) {
+  const n = Math.min(tr.count, S.trailLen);
+  if (n < 2) return;
+  const start = (tr.head - n + CAP) % CAP, mode = S.mode;
+  const groups = [];
+  let lx = 0, ly = 0;
+  for (let i = 0, j = start; i < n; i++, j = j + 1 === CAP ? 0 : j + 1) {
+    const X = ox + tr.x[j] * sc, Y = oy - tr.y[j] * sc;
+    if (i === 0) { lx = X; ly = Y; continue; }
+    const dx = X - lx, dy = Y - ly;
+    if (dx * dx + dy * dy < 0.36 && i < n - 1) continue;
+    const f = i / n;
+    let key;
+    if (mode === 'age') key = (f * CH) | 0;
+    else {
+      const tier = (f * TIERS) | 0;
+      if (mode === 'speed') {
+        let u = tr.v[j] / vmax; if (u > 1) u = 1;
+        key = tier * NB + ((Math.pow(u, 0.75) * (NB - 1)) | 0);
+      } else key = tier;
+    }
+    const p = groups[key] || (groups[key] = new Path2D());
+    p.moveTo(lx, ly); p.lineTo(X, Y);
+    lx = X; ly = Y;
+  }
+  ctx.lineWidth = S.lw;
+  groups.forEach((p, key) => {
+    let col, a;
+    if (mode === 'speed') {
+      col = hsl(hueOf(twin, (key % NB) / (NB - 1)), theme.s, theme.l); a = tierAlpha[(key / NB) | 0];
+    } else if (mode === 'age') {
+      const u = (key + 0.5) / CH;
+      col = hsl(hueOf(twin, u), theme.s, theme.l); a = 0.06 + 0.9 * Math.pow(u, 1.4);
+    } else { col = twin ? theme.twin : theme.accent; a = tierAlpha[key]; }
+    ctx.globalAlpha = a; ctx.strokeStyle = col; ctx.stroke(p);
+  });
+  ctx.globalAlpha = 1;
+}
+
+const bobR = m => 6 + 3.5 * Math.sqrt(m);
+
+function drawPendulum(s, twin, ox, oy, sc) {
+  const x1 = ox + P.l1 * Math.sin(s[0]) * sc, y1 = oy + P.l1 * Math.cos(s[0]) * sc;
+  const x2 = x1 + P.l2 * Math.sin(s[1]) * sc, y2 = y1 + P.l2 * Math.cos(s[1]) * sc;
+  if (!twin) { bob.x1 = x1; bob.y1 = y1; bob.x2 = x2; bob.y2 = y2; }
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = theme.ink;
+  ctx.lineWidth = 2.2;
+  ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  const col = twin ? theme.twin : theme.accent;
+  const r1 = bobR(P.m1), r2 = bobR(P.m2);
+  ctx.fillStyle = col;
+  ctx.beginPath(); ctx.arc(x1, y1, r1, 0, 6.2832); ctx.fill();
+  ctx.beginPath(); ctx.arc(x2, y2, r2, 0, 6.2832); ctx.fill();
+  ctx.strokeStyle = theme.stage; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(x2, y2, r2, 0, 6.2832); ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+/* Two views side by side, one scale for both, so the paths can be compared directly. */
+function draw() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+
+  const two = S.twin, pw = two ? W / 2 : W, hdr = two ? topPad + 22 : topPad;
+  const ch = Math.max(40, H - hdr - 28);
+  const scl = Math.max(16, (Math.min(pw, ch) / 2 - 10) / (P.l1 + P.l2));
+  const cy = hdr + ch / 2;
+  const views = two
+    ? [[0, sA, trA, false, 'Original · drag bobs'], [pw, sB, trB, true, 'Twin +' + S.eps.toExponential(1) + ' rad']]
+    : [[0, sA, trA, false, '']];
+
+  for (const [x0, s, tr, twin, label] of views) {
+    const cx = x0 + pw / 2;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(x0, 0, pw, H); ctx.clip();
+    if (S.reach) {
+      ctx.strokeStyle = theme.line; ctx.lineWidth = 1; ctx.setLineDash([3, 5]);
+      ctx.beginPath(); ctx.arc(cx, cy, (P.l1 + P.l2) * scl, 0, 6.2832); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    drawTrail(tr, twin, cx, cy, scl);
+    drawPendulum(s, twin, cx, cy, scl);
+    ctx.fillStyle = theme.stage; ctx.strokeStyle = theme.ink; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, 4, 0, 6.2832); ctx.fill(); ctx.stroke();
+    if (two) paneLabel(x0 + 12, hdr - 12, label, twin);
+    paneKey(x0 + 12, H - 14, twin);
+    ctx.restore();
+    if (!twin) { ox = cx; oy = cy; sc = scl; }
+  }
+  if (two) {
+    ctx.strokeStyle = theme.line; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(Math.round(pw) + 0.5, 0); ctx.lineTo(Math.round(pw) + 0.5, H); ctx.stroke();
+  }
+}
+
+/* ------------------------------------------------- per-view label and color key */
+function paneLabel(x, y, text, twin) {
+  ctx.font = '500 11.5px ' + theme.mono; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  ctx.fillStyle = twin ? theme.twin : theme.accent;
+  ctx.beginPath(); ctx.arc(x + 4, y, 4, 0, 6.2832); ctx.fill();
+  ctx.fillStyle = theme.ink; ctx.fillText(text, x + 16, y);
+}
+function paneKey(x, y, twin) {
+  ctx.font = '400 11px ' + theme.mono; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  if (S.mode === 'solid') {
+    ctx.fillStyle = twin ? theme.twin : theme.accent; ctx.fillRect(x, y - 2, 56, 4);
+    ctx.fillStyle = theme.muted; ctx.fillText('tracer', x + 64, y);
+    return;
+  }
+  const left = S.mode === 'speed' ? 'slow' : 'old', right = S.mode === 'speed' ? 'fast' : 'new';
+  ctx.fillStyle = theme.muted; ctx.fillText(left, x, y);
+  const gx = x + ctx.measureText(left).width + 8, grad = ctx.createLinearGradient(gx, 0, gx + 56, 0);
+  for (let i = 0; i <= 6; i++) grad.addColorStop(i / 6, hsl(hueOf(twin, i / 6), theme.s, theme.l));
+  ctx.fillStyle = grad; ctx.fillRect(gx, y - 2, 56, 4);
+  ctx.fillStyle = theme.muted; ctx.fillText(right, gx + 64, y);
+}
+
+/* ---------------------------------------------------------------- sparkline */
+function fmtSci(v) { return v >= 0.01 && v < 1000 ? String(+v.toPrecision(1)) : v.toExponential(0); }
+function drawSpark() {
+  sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  sctx.clearRect(0, 0, SW, SH);
+  if (!S.twin || sepT.length < 2) return;
+  let lo = Infinity, hi = -Infinity;
+  for (const v of sepV) { if (v < lo) lo = v; if (v > hi) hi = v; }
+  lo = Math.floor(lo); hi = Math.ceil(hi); if (hi - lo < 1) hi = lo + 1;
+  const padL = 8, padR = 8, padT = 12, padB = 16, w = SW - padL - padR, h = SH - padT - padB;
+  const tMax = sepT[sepT.length - 1] || 1;
+  const X = ti => padL + ti / tMax * w, Y = v => padT + h - (v - lo) / (hi - lo) * h;
+  sctx.strokeStyle = theme.line; sctx.lineWidth = 1;
+  for (let d = lo; d <= hi; d++) { sctx.beginPath(); sctx.moveTo(padL, Y(d)); sctx.lineTo(SW - padR, Y(d)); sctx.stroke(); }
+  sctx.beginPath();
+  sepT.forEach((ti, i) => i ? sctx.lineTo(X(ti), Y(sepV[i])) : sctx.moveTo(X(ti), Y(sepV[i])));
+  sctx.lineWidth = 1.6; sctx.lineJoin = 'round'; sctx.strokeStyle = theme.accent; sctx.stroke();
+  sctx.lineTo(X(tMax), Y(lo)); sctx.lineTo(X(sepT[0]), Y(lo)); sctx.closePath();
+  sctx.globalAlpha = 0.1; sctx.fillStyle = theme.accent; sctx.fill(); sctx.globalAlpha = 1;
+  sctx.font = '400 10px ' + theme.mono; sctx.fillStyle = theme.muted;
+  sctx.textAlign = 'right'; sctx.textBaseline = 'top'; sctx.fillText(fmtSci(Math.pow(10, hi)), SW - padR, 1);
+  sctx.textBaseline = 'bottom'; sctx.fillText(fmtSci(Math.pow(10, lo)), SW - padR, SH - padB - 2);
+  sctx.textAlign = 'left'; sctx.textBaseline = 'bottom'; sctx.fillText('0', padL, SH - 2);
+  sctx.textAlign = 'right'; sctx.fillText(tMax.toFixed(0) + ' s', SW - padR, SH - 2);
+}
+function updateSparkNote() {
+  $('sparknote').textContent = S.twin
+    ? 'Distance between the two tracer tips on a log scale, starting from a gap of ' + S.eps.toExponential(1) + ' rad in θ₁. A steady climb is exponential divergence. A flat line means the motion is regular.'
+    : 'Turn on the twin pendulum to track how a tiny difference in the start grows.';
+}
+
+/* ----------------------------------------------------------------- readouts */
+function readouts() {
+  $('r-t').textContent = t.toFixed(2);
+  $('r-a').textContent = wrapDeg(sA[0] * R2D).toFixed(1);
+  $('r-b').textContent = wrapDeg(sA[1] * R2D).toFixed(1);
+  $('r-c').textContent = sA[2].toFixed(2);
+  $('r-d').textContent = sA[3].toFixed(2);
+  const dE = (energy(sA) - E0) / ((P.m1 + P.m2) * P.g * (P.l1 + P.l2)) * 100;
+  $('r-e').textContent = (Math.abs(dE) < 5e-5 ? 0 : dE).toFixed(4);
+  $('r-gw').hidden = !S.twin;
+  if (S.twin) {
+    const gap = Math.hypot(tipX(sA) - tipX(sB), tipY(sA) - tipY(sB));
+    $('r-g').textContent = gap < 0.01 ? gap.toExponential(1) : gap.toFixed(3);
+  }
+  topPad = $('readout').offsetHeight + 12;
+}
+function updateHint() {
+  $('hint').hidden = S.twin;
+}
+
+let noticeTimer = 0;
+function showNotice(msg, ms) {
+  const n = $('notice'); n.textContent = msg; n.hidden = false;
+  clearTimeout(noticeTimer); if (ms) noticeTimer = setTimeout(hideNotice, ms);
+}
+function hideNotice() { $('notice').hidden = true; }
+
+/* --------------------------------------------------------------- UI factory */
+function makeSlider(parent, cfg) {
+  const row = el('div', 'ctl');
+  const lab = el('label', 'lab');
+  if (cfg.sym) lab.append(el('span', 'sym', cfg.sym));
+  lab.append(el('span', 'nm', cfg.name || ''));
+  const num = el('input', 'num'); num.type = 'number'; num.step = 'any'; num.inputMode = 'decimal';
+  const range = el('input'); range.type = 'range'; range.min = cfg.min; range.max = cfg.max; range.step = cfg.step;
+  const uid = 'c' + Math.random().toString(36).slice(2, 8);
+  range.id = uid; num.id = uid + '-n'; lab.htmlFor = uid;
+  num.setAttribute('aria-label', (cfg.name || cfg.sym) + ' value');
+  const fmt = cfg.fmt || (v => v.toFixed(cfg.dp));
+  const toS = cfg.toS || (v => v), fromS = cfg.fromS || (s => s);
+  let val = cfg.value;
+  const paint = () => range.style.setProperty('--p', ((+range.value - cfg.min) / (cfg.max - cfg.min) * 100) + '%');
+  const api = { get: () => val, set(v) { val = v; range.value = toS(v); num.value = fmt(v); paint(); } };
+  range.addEventListener('input', () => { val = fromS(+range.value); num.value = fmt(val); paint(); cfg.onInput(val); });
+  num.addEventListener('input', () => {
+    const v = parseFloat(num.value);
+    if (!Number.isFinite(v) || (cfg.positive && v <= 0)) return;
+    val = v; range.value = toS(v); paint(); cfg.onInput(v);
+  });
+  num.addEventListener('change', () => { num.value = fmt(val); });
+  row.append(lab, num, range);
+  parent.append(row);
+  api.set(cfg.value);
+  return api;
+}
+function makeSwitch(parent, label, checked, onChange) {
+  const row = el('div', 'row');
+  const uid = 'c' + Math.random().toString(36).slice(2, 8);
+  const lab = el('label', null, label); lab.htmlFor = uid;
+  const i = el('input', 'sw'); i.type = 'checkbox'; i.id = uid; i.checked = checked;
+  i.addEventListener('change', () => onChange(i.checked));
+  row.append(lab, i); parent.append(row);
+  return i;
+}
+function makeSelect(parent, label, options, value, onChange) {
+  const row = el('div', 'row');
+  const uid = 'c' + Math.random().toString(36).slice(2, 8);
+  const lab = el('label', null, label); lab.htmlFor = uid;
+  const s = el('select'); s.id = uid;
+  for (const [k, text] of options) { const o = el('option', null, text); o.value = k; s.append(o); }
+  s.value = value; s.addEventListener('change', () => onChange(s.value));
+  row.append(lab, s); parent.append(row);
+  return s;
+}
+
+/* ------------------------------------------------------------- build panels */
+const poseSliders = {};
+const PRESETS = [
+  { name: 'Chaotic 120° / −10°', th1: 120, th2: -10 },
+  { name: 'Horizontal 90° / 90°', th1: 90, th2: 90 },
+  { name: 'Upright 179° / 179°', th1: 179, th2: 179 },
+  { name: 'Regular 30° / 30°', th1: 30, th2: 30 }
+];
+
+function buildPose() {
+  const box = $('pose');
+  const mk = (key, sym, name, min, max, step, dp) => poseSliders[key] = makeSlider(box, {
+    sym, name, min, max, step, dp, value: I[key], onInput: v => { I[key] = v; reset(); }
+  });
+  mk('th1', 'θ₁', 'Inner angle (°)', -180, 180, 0.1, 1);
+  mk('th2', 'θ₂', 'Outer angle (°)', -180, 180, 0.1, 1);
+  mk('w1', 'ω₁', 'Inner spin (rad/s)', -12, 12, 0.1, 1);
+  mk('w2', 'ω₂', 'Outer spin (rad/s)', -12, 12, 0.1, 1);
+  const chips = $('presets');
+  for (const pr of PRESETS) {
+    const b = el('button', 'chip', pr.name); b.type = 'button';
+    b.addEventListener('click', () => {
+      I.th1 = pr.th1; I.th2 = pr.th2; I.w1 = 0; I.w2 = 0;
+      for (const k in poseSliders) poseSliders[k].set(I[k]);
+      reset();
+    });
+    chips.append(b);
+  }
+}
+function buildPhys() {
+  const box = $('phys');
+  const live = (key, onTouch) => v => { P[key] = v; E0 = energy(sA); if (onTouch) onTouch(); };
+  makeSlider(box, { sym: 'm₁', name: 'Inner mass', min: 0.1, max: 5, step: 0.1, dp: 1, positive: true, value: P.m1, onInput: live('m1') });
+  makeSlider(box, { sym: 'm₂', name: 'Outer mass', min: 0.1, max: 5, step: 0.1, dp: 1, positive: true, value: P.m2, onInput: live('m2') });
+  makeSlider(box, { sym: 'L₁', name: 'Inner length', min: 0.2, max: 2.5, step: 0.01, dp: 2, positive: true, value: P.l1, onInput: live('l1', clearTrails) });
+  makeSlider(box, { sym: 'L₂', name: 'Outer length', min: 0.2, max: 2.5, step: 0.01, dp: 2, positive: true, value: P.l2, onInput: live('l2', clearTrails) });
+  makeSlider(box, { sym: 'g', name: 'Gravity', min: 0.5, max: 25, step: 0.01, dp: 2, positive: true, value: P.g, onInput: live('g') });
+  makeSlider(box, { sym: 'c', name: 'Damping', min: 0, max: 1, step: 0.005, dp: 3, value: P.c, onInput: live('c') });
+}
+function buildTracer() {
+  const box = $('tracer');
+  makeSelect(box, 'Color by', [['speed', 'Speed'], ['age', 'Age'], ['solid', 'Solid']], S.mode, v => { S.mode = v; });
+  makeSlider(box, { name: 'Trail length (points)', min: 200, max: CAP, step: 100, dp: 0, value: S.trailLen, onInput: v => { S.trailLen = clamp(Math.round(v), 50, CAP); } });
+  makeSlider(box, { name: 'Line width', min: 0.5, max: 4, step: 0.1, dp: 1, value: S.lw, onInput: v => { S.lw = clamp(v, 0.3, 8); } });
+  makeSwitch(box, 'Twin pendulum', S.twin, v => {
+    S.twin = v;
+    if (v) { resetTwin(); } else updateSparkNote();
+    updateHint();
+  });
+  makeSlider(box, {
+    name: 'Twin offset in θ₁ (rad)', min: -6, max: -1, step: 0.1,
+    toS: v => Math.log10(v), fromS: s => Math.pow(10, s),
+    fmt: v => v >= 0.01 ? String(+v.toPrecision(2)) : v.toExponential(1), positive: true,
+    value: S.eps, onInput: v => { S.eps = v; reset(); }
+  });
+  makeSwitch(box, 'Reach circle', S.reach, v => { S.reach = v; });
+}
+function buildTime() {
+  const box = $('time');
+  makeSlider(box, { name: 'Speed (× real time)', min: 0.1, max: 10, step: 0.1, dp: 1, positive: true, value: S.speed, onInput: v => { S.speed = clamp(v, 0.05, 20); } });
+  makeSlider(box, { name: 'Time step (s)', min: 0.001, max: 0.02, step: 0.001, fmt: fmtG, positive: true, value: S.dt, onInput: v => { S.dt = clamp(v, 0.0002, 0.05); } });
+}
+
+/* -------------------------------------------------------------- interaction */
+let dragTarget = 0, wasPaused = false;
+const ptr = e => { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+function hit(p) {
+  const d1 = Math.hypot(p.x - bob.x1, p.y - bob.y1), d2 = Math.hypot(p.x - bob.x2, p.y - bob.y2);
+  const r1 = bobR(P.m1) + 12, r2 = bobR(P.m2) + 12;
+  if (d2 <= r2 && d2 <= d1) return 2;
+  if (d1 <= r1) return 1;
+  return 0;
+}
+function applyDrag(p) {
+  if (dragTarget === 1) I.th1 = Math.round(wrapDeg(Math.atan2(p.x - ox, p.y - oy) * R2D) * 10) / 10;
+  else I.th2 = Math.round(wrapDeg(Math.atan2(p.x - bob.x1, p.y - bob.y1) * R2D) * 10) / 10;
+  I.w1 = 0; I.w2 = 0;
+  for (const k in poseSliders) poseSliders[k].set(I[k]);
+  reset();
+}
+cv.addEventListener('pointerdown', e => {
+  const p = ptr(e), h = hit(p);
+  if (!h) return;
+  dragTarget = h; cv.setPointerCapture(e.pointerId);
+  wasPaused = S.paused; setPaused(true);
+  cv.style.cursor = 'grabbing';
+  applyDrag(p);
+});
+cv.addEventListener('pointermove', e => {
+  const p = ptr(e);
+  if (dragTarget) { applyDrag(p); return; }
+  cv.style.cursor = hit(p) ? 'grab' : 'default';
+});
+const release = () => {
+  if (!dragTarget) return;
+  dragTarget = 0; cv.style.cursor = 'default';
+  setPaused(wasPaused);
+};
+cv.addEventListener('pointerup', release);
+cv.addEventListener('pointercancel', release);
+
+function setPaused(p) {
+  S.paused = p;
+  const b = $('btn-pause'); b.textContent = p ? 'Play' : 'Pause'; b.setAttribute('aria-pressed', String(p));
+}
+$('btn-pause').addEventListener('click', () => setPaused(!S.paused));
+$('btn-restart').addEventListener('click', reset);
+$('btn-clear').addEventListener('click', clearTrails);
+document.addEventListener('keydown', e => {
+  if (/^(INPUT|SELECT|TEXTAREA|BUTTON|SUMMARY)$/.test(e.target.tagName) || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.code === 'Space') { e.preventDefault(); setPaused(!S.paused); }
+  else if (e.key === 'r' || e.key === 'R') reset();
+  else if (e.key === 'c' || e.key === 'C') clearTrails();
+});
+
+/* --------------------------------------------------------------------- loop */
+let last = 0, frameNo = 0;
+function frame(ts) {
+  const dtReal = Math.min((ts - last) / 1000 || 0.016, 0.05); last = ts;
+  if (!S.paused && !dragTarget) {
+    acc += S.speed * dtReal;
+    let n = Math.floor(acc / S.dt);
+    if (n > 800) { n = 800; acc = 0; } else acc -= n * S.dt;
+    while (n-- > 0) stepOnce();
+    if (!Number.isFinite(sA[0] + sA[1] + sA[2] + sA[3])) {
+      reset(); showNotice('The simulation became unstable and was restarted. Lower the time step.', 6000);
+    }
+  }
+  draw();
+  if ((frameNo++ & 3) === 0) { readouts(); drawSpark(); }
+  requestAnimationFrame(frame);
+}
+
+/* --------------------------------------------------------------------- boot */
+readTheme();
+if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readTheme);
+new MutationObserver(readTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+new ResizeObserver(resize).observe(stage);
+resize();
+buildPose(); buildPhys(); buildTracer(); buildTime();
+reset(); updateHint();
+requestAnimationFrame(frame);
+})();
+</script>
