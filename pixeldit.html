@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-900 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Perler Bead Pattern Studio</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Phosphor Icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+    /* Checkerboard background for transparent image preview */
+    .bg-checker {
+      background-color: #1e293b;
+      background-image: linear-gradient(45deg, #0f172a 25%, transparent 25%),
+                        linear-gradient(-45deg, #0f172a 25%, transparent 25%),
+                        linear-gradient(45deg, transparent 75%, #0f172a 75%),
+                        linear-gradient(-45deg, transparent 75%, #0f172a 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    }
+    /* Canvas smooth rendering overrides */
+    canvas {
+      image-rendering: -moz-crisp-edges;
+      image-rendering: -webkit-crisp-edges;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #print-area, #print-area * {
+        visibility: visible;
+      }
+      #print-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        color: black;
+      }
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col font-sans antialiased overflow-hidden">
+
+  <!-- Header -->
+  <header class="bg-slate-800/80 backdrop-blur border-b border-slate-700/60 px-6 py-3.5 flex items-center justify-between shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-slate-950 font-black text-xl shadow-lg shadow-emerald-500/20">
+        <i class="ph-bold ph-grid-nine"></i>
+      </div>
+      <div>
+        <h1 class="font-bold text-lg leading-tight text-white flex items-center gap-2">
+          Perler Pattern Studio
+          <span class="text-xs bg-emerald-500/10 text-emerald-400 font-medium px-2 py-0.5 rounded-full border border-emerald-500/20">Pro Craft Tool</span>
+        </h1>
+        <p class="text-xs text-slate-400">Convert photos into pixelated bead patterns & calculate exact bead counts</p>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="flex items-center gap-3">
+      <button id="btn-sample" class="text-xs bg-slate-700/60 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-lg font-medium transition flex items-center gap-1.5 border border-slate-600/50">
+        <i class="ph-bold ph-image-square"></i> Load Sample
+      </button>
+      <button id="btn-export" disabled class="disabled:opacity-50 disabled:cursor-not-allowed text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-semibold transition flex items-center gap-1.5 shadow-lg shadow-emerald-600/20">
+        <i class="ph-bold ph-download-simple"></i> Download Pattern
+      </button>
+      <button id="btn-print" disabled class="disabled:opacity-50 disabled:cursor-not-allowed text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-3.5 py-2 rounded-lg font-medium transition flex items-center gap-1.5 border border-slate-600/50">
+        <i class="ph-bold ph-printer"></i> Print Sheet
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <div class="flex-1 flex overflow-hidden">
+
+    <!-- Sidebar Controls -->
+    <aside class="w-80 lg:w-96 bg-slate-800/50 border-r border-slate-700/60 flex flex-col shrink-0 overflow-y-auto">
+      
+      <!-- Upload Box -->
+      <div class="p-5 border-b border-slate-700/60">
+        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Source Image</label>
+        <div id="drop-zone" class="border-2 border-dashed border-slate-600 hover:border-emerald-500/80 rounded-xl p-5 text-center cursor-pointer transition bg-slate-900/40 hover:bg-slate-900/80 group">
+          <input type="file" id="file-input" accept="image/png, image/jpeg, image/webp" class="hidden">
+          <div class="w-12 h-12 rounded-full bg-slate-800 text-slate-400 group-hover:text-emerald-400 group-hover:bg-emerald-500/10 flex items-center justify-center mx-auto mb-2 transition">
+            <i class="ph-bold ph-upload-simple text-2xl"></i>
+          </div>
+          <p class="text-xs font-medium text-slate-300">Click or drag & drop photo here</p>
+          <p class="text-[10px] text-slate-500 mt-1">Supports PNG, JPG, WebP</p>
+        </div>
+      </div>
+
+      <!-- Controls Form -->
+      <div class="p-5 space-y-6 flex-1">
+
+        <!-- Grid Size Controller -->
+        <div class="space-y-2">
+          <div class="flex justify-between items-center">
+            <label for="slider-width" class="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+              <i class="ph-bold ph-arrows-out-line-horizontal text-emerald-400"></i> Grid Width (Beads)
+            </label>
+            <span id="val-width" class="text-xs font-bold bg-slate-900 px-2 py-0.5 rounded text-emerald-400 border border-slate-700">29 beads</span>
+          </div>
+          <input type="range" id="slider-width" min="10" max="100" value="29" class="w-full accent-emerald-500 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+          <div class="flex justify-between text-[10px] text-slate-500">
+            <span>10 (Small / 1 board)</span>
+            <span>29 (Standard board)</span>
+            <span>100 (Large)</span>
+          </div>
+        </div>
+
+        <!-- Palette Color Reduction -->
+        <div class="space-y-2">
+          <div class="flex justify-between items-center">
+            <label for="slider-colors" class="text-xs font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+              <i class="ph-bold ph-palette text-emerald-400"></i> Max Color Palette
+            </label>
+            <span id="val-colors" class="text-xs font-bold bg-slate-900 px-2 py-0.5 rounded text-emerald-400 border border-slate-700">12 colors</span>
+          </div>
+          <input type="range" id="slider-colors" min="2" max="32" value="12" class="w-full accent-emerald-500 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+          <div class="flex justify-between text-[10px] text-slate-500">
+            <span>2 (Minimal)</span>
+            <span>16 (Balanced)</span>
+            <span>32 (Detailed)</span>
+          </div>
+        </div>
+
+        <!-- Image Fidelity & Adjustment Controls -->
+        <div class="space-y-3 pt-2 border-t border-slate-700/60">
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">Image Processing & Dynamics</label>
+
+          <!-- Brightness -->
+          <div class="space-y-1">
+            <div class="flex justify-between text-[11px] text-slate-300">
+              <span>Brightness</span>
+              <span id="val-brightness" class="font-mono text-emerald-400">100%</span>
+            </div>
+            <input type="range" id="slider-brightness" min="50" max="150" value="100" class="w-full accent-emerald-500 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+          </div>
+
+          <!-- Contrast -->
+          <div class="space-y-1">
+            <div class="flex justify-between text-[11px] text-slate-300">
+              <span>Contrast</span>
+              <span id="val-contrast" class="font-mono text-emerald-400">100%</span>
+            </div>
+            <input type="range" id="slider-contrast" min="50" max="200" value="100" class="w-full accent-emerald-500 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+          </div>
+
+          <!-- Saturation -->
+          <div class="space-y-1">
+            <div class="flex justify-between text-[11px] text-slate-300">
+              <span>Saturation</span>
+              <span id="val-saturation" class="font-mono text-emerald-400">100%</span>
+            </div>
+            <input type="range" id="slider-saturation" min="0" max="200" value="100" class="w-full accent-emerald-500 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+          </div>
+
+          <!-- Dithering Toggle -->
+          <label class="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/50 hover:bg-slate-900 border border-slate-700/50 cursor-pointer text-xs transition mt-2">
+            <span class="flex items-center gap-2 text-slate-300 font-medium">
+              <i class="ph-bold ph-dots-nine text-emerald-400"></i> Floyd-Steinberg Dithering
+            </span>
+            <input type="checkbox" id="toggle-dither" class="w-4 h-4 rounded accent-emerald-500 bg-slate-800 border-slate-600">
+          </label>
+
+          <!-- Perceptual Lab Matching Toggle -->
+          <label class="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/50 hover:bg-slate-900 border border-slate-700/50 cursor-pointer text-xs transition">
+            <span class="flex items-center gap-2 text-slate-300 font-medium">
+              <i class="ph-bold ph-eye text-emerald-400"></i> Perceptual Color Space (CIELAB)
+            </span>
+            <input type="checkbox" id="toggle-cielab" checked class="w-4 h-4 rounded accent-emerald-500 bg-slate-800 border-slate-600">
+          </label>
+        </div>
+
+        <!-- Rendering & Visualization Options -->
+        <div class="space-y-3 pt-2 border-t border-slate-700/60">
+          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">View & Style Settings</label>
+          
+          <!-- Toggle Grid Lines -->
+          <label class="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/50 hover:bg-slate-900 border border-slate-700/50 cursor-pointer text-xs transition">
+            <span class="flex items-center gap-2 text-slate-300 font-medium">
+              <i class="ph-bold ph-grid-four text-slate-400"></i> Show Pegboard Grid Lines
+            </span>
+            <input type="checkbox" id="toggle-grid" checked class="w-4 h-4 rounded accent-emerald-500 bg-slate-800 border-slate-600">
+          </label>
+
+          <!-- Bead Style Options -->
+          <div class="grid grid-cols-2 gap-2 pt-1">
+            <button id="style-circle" class="btn-style active text-xs font-medium py-2 px-3 rounded-lg border border-emerald-500/50 bg-emerald-500/10 text-emerald-400 flex items-center justify-center gap-2 transition">
+              <i class="ph-bold ph-circle"></i> Round Beads
+            </button>
+            <button id="style-square" class="btn-style text-xs font-medium py-2 px-3 rounded-lg border border-slate-700 bg-slate-900/40 text-slate-400 hover:text-slate-200 flex items-center justify-center gap-2 transition">
+              <i class="ph-bold ph-square"></i> Flat Pixel
+            </button>
+          </div>
+        </div>
+
+        <!-- Grid Dimension Stats -->
+        <div class="p-3.5 rounded-xl bg-slate-900/80 border border-slate-700/60 space-y-2 text-xs">
+          <div class="flex justify-between text-slate-400">
+            <span>Dimensions:</span>
+            <span id="stat-dimensions" class="font-mono text-slate-200">0 x 0 beads</span>
+          </div>
+          <div class="flex justify-between text-slate-400">
+            <span>Total Pegs Required:</span>
+            <span id="stat-total-beads" class="font-bold text-emerald-400 font-mono">0</span>
+          </div>
+          <div class="flex justify-between text-slate-400">
+            <span>Estimated Pegboards (29x29):</span>
+            <span id="stat-boards" class="font-mono text-slate-200">0 boards</span>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+
+    <!-- Center Workspace: Interactive Canvas Preview -->
+    <main class="flex-1 bg-slate-950 flex flex-col items-center justify-center relative p-6 overflow-hidden">
+      
+      <!-- Placeholder when no image loaded -->
+      <div id="canvas-placeholder" class="text-center max-w-sm p-8 rounded-2xl border border-slate-800 bg-slate-900/40 backdrop-blur">
+        <div class="w-16 h-16 rounded-2xl bg-slate-800/80 text-emerald-400 flex items-center justify-center mx-auto mb-4 border border-slate-700">
+          <i class="ph-bold ph-palette text-3xl"></i>
+        </div>
+        <h2 class="text-base font-bold text-slate-200 mb-1">No Image Loaded</h2>
+        <p class="text-xs text-slate-400 mb-5 leading-relaxed">Upload a photo or try our sample image to automatically transform it into a Perler bead grid template.</p>
+        <button id="btn-placeholder-sample" class="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2.5 rounded-xl transition shadow-lg shadow-emerald-600/20 inline-flex items-center gap-2">
+          <i class="ph-bold ph-sparkle"></i> Load Demo Sample
+        </button>
+      </div>
+
+      <!-- Live Canvas Render Container -->
+      <div id="canvas-wrapper" class="hidden relative flex-1 w-full h-full flex flex-col items-center justify-center overflow-auto">
+        
+        <div class="bg-checker p-4 rounded-xl shadow-2xl border border-slate-800 inline-block max-w-full max-h-full">
+          <canvas id="preview-canvas" class="block max-w-full max-h-[70vh] object-contain cursor-crosshair rounded"></canvas>
+        </div>
+
+        <div class="mt-3 flex items-center gap-4 text-xs text-slate-400 bg-slate-900/80 px-4 py-1.5 rounded-full border border-slate-800">
+          <span class="flex items-center gap-1.5"><i class="ph-bold ph-magnifying-glass"></i> Live Render</span>
+          <span>•</span>
+          <span id="hover-color-info" class="font-mono text-slate-300">Hover pattern to inspect colors</span>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Right Sidebar: Color Breakdown & Bead Order List -->
+    <aside class="w-80 lg:w-96 bg-slate-800/50 border-l border-slate-700/60 flex flex-col shrink-0 overflow-hidden">
+      
+      <div class="p-4 border-b border-slate-700/60 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i class="ph-bold ph-list-numbers text-emerald-400"></i>
+          <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-200">Required Bead Shopping List</h2>
+        </div>
+        <span id="badge-color-count" class="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold">0 Colors</span>
+      </div>
+
+      <!-- Color Table List -->
+      <div class="flex-1 overflow-y-auto p-3 space-y-2" id="color-list-container">
+        <div class="text-center text-slate-500 py-12 text-xs">
+          Upload an image to compute required bead quantities.
+        </div>
+      </div>
+
+      <!-- Footer Summary -->
+      <div class="p-4 border-t border-slate-700/60 bg-slate-900/80">
+        <div class="flex justify-between items-center text-xs text-slate-300 mb-1">
+          <span>Total Project Beads:</span>
+          <span id="summary-total-beads" class="font-mono font-bold text-emerald-400 text-sm">0</span>
+        </div>
+        <p class="text-[10px] text-slate-500">Tip: We recommend ordering +10% extra beads for sorting margin.</p>
+      </div>
+
+    </aside>
+
+  </div>
+
+  <!-- Hidden Printable Area for Clean Printing -->
+  <div id="print-area" class="hidden">
+    <div style="padding: 20px; font-family: sans-serif;">
+      <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 5px;">Perler Bead Pattern & Shopping Sheet</h1>
+      <p style="font-size: 12px; color: #666; margin-bottom: 20px;">Generated with Perler Pattern Studio</p>
+      
+      <div style="margin-bottom: 20px;" id="print-image-container"></div>
+      
+      <h2 style="font-size: 16px; font-weight: bold; margin-bottom: 10px;">Bead Quantities Required</h2>
+      <table style="width: 100%; border-collapse: collapse; font-size: 12px;" border="1" cellpadding="6">
+        <thead>
+          <tr style="background: #f3f4f6;">
+            <th>Swatch</th>
+            <th>Hex / Color Code</th>
+            <th>Bead Quantity</th>
+            <th>Percentage</th>
+          </tr>
+        </thead>
+        <tbody id="print-table-body">
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Main JavaScript App Logic -->
+  <script>
+    // State Management
+    const state = {
+      image: null,
+      gridWidth: 29,
+      maxColors: 12,
+      brightness: 100,
+      contrast: 100,
+      saturation: 100,
+      useDithering: false,
+      useCielab: true,
+      showGrid: true,
+      beadStyle: 'circle', // 'circle' | 'square'
+      reducedColors: [],
+      pixelData: null,
+      gridHeight: 0,
+      totalBeads: 0
+    };
+
+    // DOM Elements
+    const fileInput = document.getElementById('file-input');
+    const dropZone = document.getElementById('drop-zone');
+    const sliderWidth = document.getElementById('slider-width');
+    const valWidth = document.getElementById('val-width');
+    const sliderColors = document.getElementById('slider-colors');
+    const valColors = document.getElementById('val-colors');
+    const sliderBrightness = document.getElementById('slider-brightness');
+    const valBrightness = document.getElementById('val-brightness');
+    const sliderContrast = document.getElementById('slider-contrast');
+    const valContrast = document.getElementById('val-contrast');
+    const sliderSaturation = document.getElementById('slider-saturation');
+    const valSaturation = document.getElementById('val-saturation');
+    const toggleDither = document.getElementById('toggle-dither');
+    const toggleCielab = document.getElementById('toggle-cielab');
+    const toggleGrid = document.getElementById('toggle-grid');
+    const styleCircleBtn = document.getElementById('style-circle');
+    const styleSquareBtn = document.getElementById('style-square');
+    const previewCanvas = document.getElementById('preview-canvas');
+    const ctx = previewCanvas.getContext('2d');
+    const canvasPlaceholder = document.getElementById('canvas-placeholder');
+    const canvasWrapper = document.getElementById('canvas-wrapper');
+    const colorListContainer = document.getElementById('color-list-container');
+    const btnSample = document.getElementById('btn-sample');
+    const btnPlaceholderSample = document.getElementById('btn-placeholder-sample');
+    const btnExport = document.getElementById('btn-export');
+    const btnPrint = document.getElementById('btn-print');
+    const hoverColorInfo = document.getElementById('hover-color-info');
+
+    // UI Stats
+    const statDimensions = document.getElementById('stat-dimensions');
+    const statTotalBeads = document.getElementById('stat-total-beads');
+    const statBoards = document.getElementById('stat-boards');
+    const summaryTotalBeads = document.getElementById('summary-total-beads');
+    const badgeColorCount = document.getElementById('badge-color-count');
+
+    // Event Listeners Initialization
+    function initEvents() {
+      dropZone.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', handleFileSelect);
+      
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('border-emerald-500', 'bg-slate-900');
+      });
+      dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('border-emerald-500', 'bg-slate-900');
+      });
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('border-emerald-500', 'bg-slate-900');
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+          loadImageFromFile(e.dataTransfer.files[0]);
+        }
+      });
+
+      // Controls
+      sliderWidth.addEventListener('input', (e) => {
+        state.gridWidth = parseInt(e.target.value);
+        valWidth.textContent = `${state.gridWidth} beads`;
+        processImage();
+      });
+
+      sliderColors.addEventListener('input', (e) => {
+        state.maxColors = parseInt(e.target.value);
+        valColors.textContent = `${state.maxColors} colors`;
+        processImage();
+      });
+
+      sliderBrightness.addEventListener('input', (e) => {
+        state.brightness = parseInt(e.target.value);
+        valBrightness.textContent = `${state.brightness}%`;
+        processImage();
+      });
+
+      sliderContrast.addEventListener('input', (e) => {
+        state.contrast = parseInt(e.target.value);
+        valContrast.textContent = `${state.contrast}%`;
+        processImage();
+      });
+
+      sliderSaturation.addEventListener('input', (e) => {
+        state.saturation = parseInt(e.target.value);
+        valSaturation.textContent = `${state.saturation}%`;
+        processImage();
+      });
+
+      toggleDither.addEventListener('change', (e) => {
+        state.useDithering = e.target.checked;
+        processImage();
+      });
+
+      toggleCielab.addEventListener('change', (e) => {
+        state.useCielab = e.target.checked;
+        processImage();
+      });
+
+      toggleGrid.addEventListener('change', (e) => {
+        state.showGrid = e.target.checked;
+        renderCanvasPattern();
+      });
+
+      styleCircleBtn.addEventListener('click', () => {
+        state.beadStyle = 'circle';
+        styleCircleBtn.className = 'btn-style active text-xs font-medium py-2 px-3 rounded-lg border border-emerald-500/50 bg-emerald-500/10 text-emerald-400 flex items-center justify-center gap-2 transition';
+        styleSquareBtn.className = 'btn-style text-xs font-medium py-2 px-3 rounded-lg border border-slate-700 bg-slate-900/40 text-slate-400 hover:text-slate-200 flex items-center justify-center gap-2 transition';
+        renderCanvasPattern();
+      });
+
+      styleSquareBtn.addEventListener('click', () => {
+        state.beadStyle = 'square';
+        styleSquareBtn.className = 'btn-style active text-xs font-medium py-2 px-3 rounded-lg border border-emerald-500/50 bg-emerald-500/10 text-emerald-400 flex items-center justify-center gap-2 transition';
+        styleCircleBtn.className = 'btn-style text-xs font-medium py-2 px-3 rounded-lg border border-slate-700 bg-slate-900/40 text-slate-400 hover:text-slate-200 flex items-center justify-center gap-2 transition';
+        renderCanvasPattern();
+      });
+
+      btnSample.addEventListener('click', loadSampleImage);
+      btnPlaceholderSample.addEventListener('click', loadSampleImage);
+      btnExport.addEventListener('click', downloadPatternImage);
+      btnPrint.addEventListener('click', printPatternSheet);
+      previewCanvas.addEventListener('mousemove', inspectCanvasPixel);
+    }
+
+    // File selection handlers
+    function handleFileSelect(e) {
+      if (e.target.files && e.target.files[0]) {
+        loadImageFromFile(e.target.files[0]);
+      }
+    }
+
+    function loadImageFromFile(file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          state.image = img;
+          canvasPlaceholder.classList.add('hidden');
+          canvasWrapper.classList.remove('hidden');
+          btnExport.disabled = false;
+          btnPrint.disabled = false;
+          processImage();
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function loadSampleImage() {
+      // Create a colorful synthetic sample canvas
+      const sampleCanvas = document.createElement('canvas');
+      sampleCanvas.width = 300;
+      sampleCanvas.height = 300;
+      const sCtx = sampleCanvas.getContext('2d');
+
+      // Draw background gradient
+      const grad = sCtx.createLinearGradient(0, 0, 300, 300);
+      grad.addColorStop(0, '#f43f5e');
+      grad.addColorStop(0.5, '#8b5cf6');
+      grad.addColorStop(1, '#06b6d4');
+      sCtx.fillStyle = grad;
+      sCtx.fillRect(0, 0, 300, 300);
+
+      // Draw decorative elements
+      sCtx.fillStyle = '#facc15';
+      sCtx.beginPath();
+      sCtx.arc(150, 150, 70, 0, Math.PI * 2);
+      sCtx.fill();
+
+      sCtx.fillStyle = '#ffffff';
+      sCtx.beginPath();
+      sCtx.arc(120, 130, 15, 0, Math.PI * 2);
+      sCtx.arc(180, 130, 15, 0, Math.PI * 2);
+      sCtx.fill();
+
+      sCtx.fillStyle = '#0f172a';
+      sCtx.beginPath();
+      sCtx.arc(120, 130, 7, 0, Math.PI * 2);
+      sCtx.arc(180, 130, 7, 0, Math.PI * 2);
+      sCtx.fill();
+
+      sCtx.strokeStyle = '#0f172a';
+      sCtx.lineWidth = 6;
+      sCtx.beginPath();
+      sCtx.arc(150, 160, 35, 0.1 * Math.PI, 0.9 * Math.PI);
+      sCtx.stroke();
+
+      const img = new Image();
+      img.onload = () => {
+        state.image = img;
+        canvasPlaceholder.classList.add('hidden');
+        canvasWrapper.classList.remove('hidden');
+        btnExport.disabled = false;
+        btnPrint.disabled = false;
+        processImage();
+      };
+      img.src = sampleCanvas.toDataURL();
+    }
+
+    // Median Cut Quantization Algorithm
+    function medianCutQuantize(pixels, maxColors) {
+      function getRange(colors, channel) {
+        let min = 255, max = 0;
+        for (let c of colors) {
+          if (c[channel] < min) min = c[channel];
+          if (c[channel] > max) max = c[channel];
+        }
+        return max - min;
+      }
+
+      function cut(boxes) {
+        if (boxes.length >= maxColors) return boxes;
+        
+        let largestBoxIdx = 0;
+        let maxRange = -1;
+        let splitChannel = 'r';
+
+        for (let i = 0; i < boxes.length; i++) {
+          const b = boxes[i];
+          if (b.length <= 1) continue;
+          
+          const rRange = getRange(b, 'r');
+          const gRange = getRange(b, 'g');
+          const bRange = getRange(b, 'b');
+
+          const boxMaxRange = Math.max(rRange, gRange, bRange);
+          if (boxMaxRange > maxRange) {
+            maxRange = boxMaxRange;
+            largestBoxIdx = i;
+            if (boxMaxRange === rRange) splitChannel = 'r';
+            else if (boxMaxRange === gRange) splitChannel = 'g';
+            else splitChannel = 'b';
+          }
+        }
+
+        if (maxRange <= 0) return boxes;
+
+        const boxToSplit = boxes.splice(largestBoxIdx, 1)[0];
+        boxToSplit.sort((a, b) => a[splitChannel] - b[splitChannel]);
+        const mid = Math.floor(boxToSplit.length / 2);
+
+        boxes.push(boxToSplit.slice(0, mid));
+        boxes.push(boxToSplit.slice(mid));
+
+        return cut(boxes);
+      }
+
+      const initialBox = pixels.slice();
+      const boxes = cut([initialBox]);
+
+      return boxes.map(box => {
+        if (box.length === 0) return { r: 0, g: 0, b: 0 };
+        let rSum = 0, gSum = 0, bSum = 0;
+        for (let c of box) {
+          rSum += c.r;
+          gSum += c.g;
+          bSum += c.b;
+        }
+        return {
+          r: Math.round(rSum / box.length),
+          g: Math.round(gSum / box.length),
+          b: Math.round(bSum / box.length)
+        };
+      });
+    }
+
+    // Color conversion utilities: RGB -> LAB for perceptual matching
+    function rgbToLab(r, g, b) {
+      let rNorm = r / 255, gNorm = g / 255, bNorm = b / 255;
+      rNorm = (rNorm > 0.04045) ? Math.pow((rNorm + 0.055) / 1.055, 2.4) : rNorm / 12.92;
+      gNorm = (gNorm > 0.04045) ? Math.pow((gNorm + 0.055) / 1.055, 2.4) : gNorm / 12.92;
+      bNorm = (bNorm > 0.04045) ? Math.pow((bNorm + 0.055) / 1.055, 2.4) : bNorm / 12.92;
+
+      let x = (rNorm * 0.4124 + gNorm * 0.3576 + bNorm * 0.1805) * 100;
+      let y = (rNorm * 0.2126 + gNorm * 0.7152 + bNorm * 0.0722) * 100;
+      let z = (rNorm * 0.0193 + gNorm * 0.1192 + bNorm * 0.9505) * 100;
+
+      x /= 95.047; y /= 100.000; z /= 108.883;
+
+      x = (x > 0.008856) ? Math.pow(x, 1/3) : (7.787 * x) + (16/116);
+      y = (y > 0.008856) ? Math.pow(y, 1/3) : (7.787 * y) + (16/116);
+      z = (z > 0.008856) ? Math.pow(z, 1/3) : (7.787 * z) + (16/116);
+
+      return {
+        l: (116 * y) - 16,
+        a: 500 * (x - y),
+        b: 200 * (y - z)
+      };
+    }
+
+    // High-Fidelity Multi-Pass Area Downsampling & Quantization Pipeline
+    function processImage() {
+      if (!state.image) return;
+
+      const img = state.image;
+      const aspect = img.height / img.width;
+      
+      state.gridHeight = Math.max(1, Math.round(state.gridWidth * aspect));
+      state.totalBeads = state.gridWidth * state.gridHeight;
+
+      // Update UI Stats
+      statDimensions.textContent = `${state.gridWidth} x ${state.gridHeight} beads`;
+      statTotalBeads.textContent = state.totalBeads.toLocaleString();
+      summaryTotalBeads.textContent = state.totalBeads.toLocaleString();
+      
+      const boardsX = Math.ceil(state.gridWidth / 29);
+      const boardsY = Math.ceil(state.gridHeight / 29);
+      statBoards.textContent = `${boardsX * boardsY} (${boardsX}x${boardsY} grid)`;
+
+      // Step 1: Render source image to temporary canvas applying user image dynamics
+      const prepCanvas = document.createElement('canvas');
+      prepCanvas.width = img.width;
+      prepCanvas.height = img.height;
+      const prepCtx = prepCanvas.getContext('2d');
+
+      prepCtx.filter = `brightness(${state.brightness}%) contrast(${state.contrast}%) saturate(${state.saturation}%)`;
+      prepCtx.drawImage(img, 0, 0);
+
+      const srcData = prepCtx.getImageData(0, 0, img.width, img.height).data;
+
+      // Step 2: Accurate Area Box Resampling (Integrate pixels per cell rather than nearest neighbor drop)
+      const cellW = img.width / state.gridWidth;
+      const cellH = img.height / state.gridHeight;
+      const gridRawRGB = [];
+
+      for (let gy = 0; gy < state.gridHeight; gy++) {
+        for (let gx = 0; gx < state.gridWidth; gx++) {
+          const startX = Math.floor(gx * cellW);
+          const endX = Math.min(img.width, Math.floor((gx + 1) * cellW));
+          const startY = Math.floor(gy * cellH);
+          const endY = Math.min(img.height, Math.floor((gy + 1) * cellH));
+
+          let rSum = 0, gSum = 0, bSum = 0, count = 0;
+
+          for (let y = startY; y < endY; y++) {
+            for (let x = startX; x < endX; x++) {
+              const idx = (y * img.width + x) * 4;
+              rSum += srcData[idx];
+              gSum += srcData[idx + 1];
+              bSum += srcData[idx + 2];
+              count++;
+            }
+          }
+
+          if (count === 0) count = 1;
+          gridRawRGB.push({
+            r: Math.round(rSum / count),
+            g: Math.round(gSum / count),
+            b: Math.round(bSum / count)
+          });
+        }
+      }
+
+      // Step 3: Extract optimal palette using median cut
+      const palette = medianCutQuantize(gridRawRGB, state.maxColors);
+
+      // Pre-compute CIELAB for palette colors for high speed match lookups
+      palette.forEach(p => p.lab = rgbToLab(p.r, p.g, p.b));
+
+      // Step 4: Map grid to palette (with optional Floyd-Steinberg Dithering)
+      const finalGrid = [];
+      const colorCounts = {};
+
+      if (state.useDithering) {
+        // Working buffer with floating point precision for error diffusion
+        const buffer = gridRawRGB.map(p => ({ r: p.r, g: p.g, b: p.b }));
+
+        for (let y = 0; y < state.gridHeight; y++) {
+          for (let x = 0; x < state.gridWidth; x++) {
+            const idx = y * state.gridWidth + x;
+            const current = buffer[idx];
+
+            // Clamp colors
+            const clampedCurrent = {
+              r: Math.min(255, Math.max(0, current.r)),
+              g: Math.min(255, Math.max(0, current.g)),
+              b: Math.min(255, Math.max(0, current.b))
+            };
+
+            const matched = findClosestColor(clampedCurrent, palette, state.useCielab);
+            finalGrid[idx] = matched;
+
+            // Compute quantization error
+            const errR = clampedCurrent.r - matched.r;
+            const errG = clampedCurrent.g - matched.g;
+            const errB = clampedCurrent.b - matched.b;
+
+            // Distribute error to neighboring pixels
+            const distribute = (dx, dy, factor) => {
+              const nx = x + dx;
+              const ny = y + dy;
+              if (nx >= 0 && nx < state.gridWidth && ny >= 0 && ny < state.gridHeight) {
+                const nIdx = ny * state.gridWidth + nx;
+                buffer[nIdx].r += errR * factor;
+                buffer[nIdx].g += errG * factor;
+                buffer[nIdx].b += errB * factor;
+              }
+            };
+
+            distribute(1, 0, 7 / 16);
+            distribute(-1, 1, 3 / 16);
+            distribute(0, 1, 5 / 16);
+            distribute(1, 1, 1 / 16);
+          }
+        }
+      } else {
+        // Direct matching without dithering
+        for (let i = 0; i < gridRawRGB.length; i++) {
+          finalGrid[i] = findClosestColor(gridRawRGB[i], palette, state.useCielab);
+        }
+      }
+
+      // Step 5: Count color occurrences
+      for (let i = 0; i < finalGrid.length; i++) {
+        const col = finalGrid[i];
+        const hex = rgbToHex(col.r, col.g, col.b);
+
+        if (!colorCounts[hex]) {
+          colorCounts[hex] = {
+            r: col.r,
+            g: col.g,
+            b: col.b,
+            hex: hex,
+            count: 0
+          };
+        }
+        colorCounts[hex].count++;
+      }
+
+      state.pixelData = finalGrid;
+      state.reducedColors = Object.values(colorCounts).sort((a, b) => b.count - a.count);
+
+      renderColorBreakdown();
+      renderCanvasPattern();
+    }
+
+    // Distance in CIELAB or RGB space
+    function findClosestColor(color, palette, useCielab = true) {
+      let minDistance = Infinity;
+      let closest = palette[0];
+
+      if (useCielab) {
+        const cLab = rgbToLab(color.r, color.g, color.b);
+        for (let p of palette) {
+          const dl = cLab.l - p.lab.l;
+          const da = cLab.a - p.lab.a;
+          const db = cLab.b - p.lab.b;
+          const distance = (dl * dl) + (da * da) + (db * db); // CIE76 perceptual distance
+
+          if (distance < minDistance) {
+            minDistance = distance;
+            closest = p;
+          }
+        }
+      } else {
+        for (let p of palette) {
+          const dr = color.r - p.r;
+          const dg = color.g - p.g;
+          const db = color.b - p.b;
+          const distance = (dr * dr * 0.3) + (dg * dg * 0.59) + (db * db * 0.11);
+
+          if (distance < minDistance) {
+            minDistance = distance;
+            closest = p;
+          }
+        }
+      }
+
+      return closest;
+    }
+
+    // Render Pattern to Main Canvas
+    function renderCanvasPattern() {
+      if (!state.pixelData) return;
+
+      // Scale factor to make pattern visible & sharp on screen
+      const cellSize = Math.max(8, Math.min(24, Math.floor(600 / state.gridWidth)));
+      const width = state.gridWidth * cellSize;
+      const height = state.gridHeight * cellSize;
+
+      previewCanvas.width = width;
+      previewCanvas.height = height;
+
+      ctx.clearRect(0, 0, width, height);
+
+      // Render individual beads
+      for (let y = 0; y < state.gridHeight; y++) {
+        for (let x = 0; x < state.gridWidth; x++) {
+          const idx = y * state.gridWidth + x;
+          const color = state.pixelData[idx];
+          const px = x * cellSize;
+          const py = y * cellSize;
+
+          if (state.beadStyle === 'square') {
+            ctx.fillStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
+            ctx.fillRect(px, py, cellSize, cellSize);
+          } else {
+            // Bead Circle Style with subtle peg hole
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(px, py, cellSize, cellSize);
+
+            const centerX = px + cellSize / 2;
+            const centerY = py + cellSize / 2;
+            const radius = (cellSize / 2) - 0.5;
+
+            // Bead Body
+            ctx.fillStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Inner Peg Hole
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.4)';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius * 0.35, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+
+      // Draw Grid Overlay & Pegboard Markers (29x29 board boundaries)
+      if (state.showGrid) {
+        ctx.lineWidth = 1;
+
+        // Thin pixel grid
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        for (let x = 0; x <= state.gridWidth; x++) {
+          ctx.beginPath();
+          ctx.moveTo(x * cellSize, 0);
+          ctx.lineTo(x * cellSize, height);
+          ctx.stroke();
+        }
+        for (let y = 0; y <= state.gridHeight; y++) {
+          ctx.beginPath();
+          ctx.moveTo(0, y * cellSize);
+          ctx.lineTo(width, y * cellSize);
+          ctx.stroke();
+        }
+
+        // Highlight 29x29 Standard Pegboard Lines
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#22c55e'; // Emerald grid boundary
+        for (let x = 0; x <= state.gridWidth; x += 29) {
+          if (x === 0) continue;
+          ctx.beginPath();
+          ctx.moveTo(x * cellSize, 0);
+          ctx.lineTo(x * cellSize, height);
+          ctx.stroke();
+        }
+        for (let y = 0; y <= state.gridHeight; y += 29) {
+          if (y === 0) continue;
+          ctx.beginPath();
+          ctx.moveTo(0, y * cellSize);
+          ctx.lineTo(width, y * cellSize);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Color Breakdown Sidebar Table UI
+    function renderColorBreakdown() {
+      colorListContainer.innerHTML = '';
+      badgeColorCount.textContent = `${state.reducedColors.length} Colors`;
+
+      state.reducedColors.forEach((col, index) => {
+        const percentage = ((col.count / state.totalBeads) * 100).toFixed(1);
+
+        const card = document.createElement('div');
+        card.className = 'flex items-center justify-between p-2.5 bg-slate-900/60 border border-slate-700/50 rounded-xl hover:border-slate-600 transition group';
+        
+        card.innerHTML = `
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg shadow-inner border border-white/20 shrink-0 relative flex items-center justify-center font-mono text-[10px] font-bold text-slate-950" style="background-color: ${col.hex}">
+              <span class="opacity-0 group-hover:opacity-100 transition bg-black/40 text-white px-1 rounded">${index + 1}</span>
+            </div>
+            <div>
+              <div class="text-xs font-mono font-bold text-slate-200">${col.hex.toUpperCase()}</div>
+              <div class="text-[10px] text-slate-400">RGB(${col.r}, ${col.g}, ${col.b})</div>
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="text-xs font-bold text-emerald-400 font-mono">${col.count.toLocaleString()} beads</div>
+            <div class="text-[10px] text-slate-400 font-mono">${percentage}%</div>
+          </div>
+        `;
+        colorListContainer.appendChild(card);
+      });
+    }
+
+    // Mouse Hover Pixel Inspector
+    function inspectCanvasPixel(e) {
+      if (!state.pixelData) return;
+
+      const rect = previewCanvas.getBoundingClientRect();
+      const scaleX = previewCanvas.width / rect.width;
+      const scaleY = previewCanvas.height / rect.height;
+
+      const canvasX = (e.clientX - rect.left) * scaleX;
+      const canvasY = (e.clientY - rect.top) * scaleY;
+
+      const cellSize = previewCanvas.width / state.gridWidth;
+      const gridX = Math.floor(canvasX / cellSize);
+      const gridY = Math.floor(canvasY / cellSize);
+
+      if (gridX >= 0 && gridX < state.gridWidth && gridY >= 0 && gridY < state.gridHeight) {
+        const idx = gridY * state.gridWidth + gridX;
+        const color = state.pixelData[idx];
+        const hex = rgbToHex(color.r, color.g, color.b);
+        hoverColorInfo.innerHTML = `Position: <span class="text-emerald-400 font-bold">(${gridX + 1}, ${gridY + 1})</span> • Color: <span class="inline-block w-2.5 h-2.5 rounded-full" style="background:${hex}"></span> <span class="text-emerald-400 font-bold">${hex}</span>`;
+      }
+    }
+
+    // Helper: RGB to HEX
+    function rgbToHex(r, g, b) {
+      return "#" + [r, g, b].map(x => {
+        const hex = x.toString(16);
+        return hex.length === 1 ? "0" + hex : hex;
+      }).join("");
+    }
+
+    // Download Pattern Action
+    function downloadPatternImage() {
+      const link = document.createElement('a');
+      link.download = `perler-pattern-${state.gridWidth}x${state.gridHeight}.png`;
+      link.href = previewCanvas.toDataURL('image/png');
+      link.click();
+    }
+
+    // Print Layout Action
+    function printPatternSheet() {
+      const printContainer = document.getElementById('print-image-container');
+      const printTable = document.getElementById('print-table-body');
+      
+      // Clear previous
+      printContainer.innerHTML = '';
+      printTable.innerHTML = '';
+
+      // Copy canvas as image
+      const img = new Image();
+      img.src = previewCanvas.toDataURL('image/png');
+      img.style.maxWidth = '100%';
+      img.style.maxHeight = '400px';
+      img.style.border = '1px solid #ccc';
+      printContainer.appendChild(img);
+
+      // Render table rows
+      state.reducedColors.forEach(col => {
+        const percentage = ((col.count / state.totalBeads) * 100).toFixed(1);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="text-align: center;"><div style="width: 20px; height: 20px; background: ${col.hex}; border: 1px solid #000; display: inline-block;"></div></td>
+          <td>${col.hex.toUpperCase()} (RGB: ${col.r}, ${col.g}, ${col.b})</td>
+          <td style="font-weight: bold;">${col.count.toLocaleString()}</td>
+          <td>${percentage}%</td>
+        `;
+        printTable.appendChild(tr);
+      });
+
+      window.print();
+    }
+
+    // Start App
+    window.addEventListener('DOMContentLoaded', () => {
+      initEvents();
+    });
+  </script>
+</body>
+</html>
